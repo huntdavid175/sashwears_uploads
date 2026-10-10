@@ -1,7 +1,8 @@
 import type { Metadata } from "next"
 import { Archivo } from "next/font/google"
+import { Suspense } from "react"
 
-import { AppHeader } from "@/components/app-header"
+import { AppHeader, AppHeaderShell } from "@/components/app-header"
 import { Toaster } from "@/components/ui/toast"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { THEME_SCRIPT } from "@/lib/theme-script"
@@ -30,7 +31,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col">
         <TooltipProvider>
           <Toaster>
-            <AppHeader />
+            <Suspense fallback={<AppHeaderShell pathname={null} />}>
+              <AppHeader />
+            </Suspense>
             {children}
           </Toaster>
         </TooltipProvider>

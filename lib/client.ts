@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
-import type { Job, StoredImage, Template, Upload } from "@/lib/types"
+import type { Product, StoredImage, Template } from "@/lib/types"
 
 /** fetch + JSON, throwing the server's `{ error }` message on failure. */
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
@@ -36,7 +36,7 @@ type UploadAuth = {
 }
 
 /** Upload one file straight from the browser to ImageKit. Returns its fileId. */
-export async function uploadToImageKit(file: File, kind: "sources" | "references" | "inbox") {
+export async function uploadToImageKit(file: File, kind: "sources" | "references") {
   if (file.size > MAX_UPLOAD_BYTES) throw new Error(`${file.name} is larger than 50MB`)
   const auth = await api<UploadAuth>(`/api/imagekit/auth?kind=${kind}`)
   const form = new FormData()
@@ -60,53 +60,40 @@ export async function uploadToImageKit(file: File, kind: "sources" | "references
 }
 
 export function useTemplates() {
-  const [templates, setTemplates] = useState<Template[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let alive = true
-    api<Template[]>("/api/templates").then(
-      (list) => alive && setTemplates(list),
-      (err: Error) => alive && setError(err.message),
-    )
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  /** Insert or replace a template locally after the server confirmed the change. */
-  const upsert = useCallback((t: Template) => {
-    setTemplates((list) => [t, ...(list ?? []).filter((x) => x.id !== t.id)])
-  }, [])
-
-  const removeLocal = useCallback((id: string) => {
-    setTemplates((list) => (list ?? []).filter((x) => x.id !== id))
-  }, [])
-
-  return { templates, error, upsert, removeLocal }
+  const { data, error, refresh } = usePolled<Template[]>("/api/templates", () => false)
+  return { templates: data, error, refresh }
 }
 
-const POLL_MS = 2000
+const POLL_MS = 3000
 
-/** Jobs for one template. Polls every 2s while anything is queued or processing. */
-export function useJobs(templateId: string) {
-  const [jobs, setJobs] = useState<Job[] | null>(null)
+/**
+ * Poll `url` every few seconds while `busy(data)` says work is running; otherwise load once
+ * (and again when the tab regains focus). `refresh()` reloads now.
+ */
+function usePolled<T>(url: string, busy: (data: T) => boolean) {
+  const [data, setData] = useState<T | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [version, setVersion] = useState(0)
+  const busyRef = useRef(busy)
+  useEffect(() => {
+    busyRef.current = busy
+  })
 
   useEffect(() => {
     let alive = true
     let timer: ReturnType<typeof setTimeout> | undefined
     const load = async () => {
       try {
-        const next = await api<Job[]>(`/api/jobs?templateId=${encodeURIComponent(templateId)}`)
+        const next = await api<T>(url)
         if (!alive) return
-        setJobs(next)
-        if (next.some((j) => j.status === "queued" || j.status === "processing")) {
-          timer = setTimeout(load, POLL_MS)
-        }
-      } catch {
-        // Server briefly unavailable (e.g. dev restart): keep trying.
-        if (alive) timer = setTimeout(load, POLL_MS * 2)
+        setData(next)
+        setError(null)
+        if (busyRef.current(next)) timer = setTimeout(load, POLL_MS)
+      } catch (err) {
+        if (!alive) return
+        setError((err as Error).message)
+        // Server briefly unavailable (e.g. a deploy): keep trying.
+        timer = setTimeout(load, POLL_MS * 3)
       }
     }
     void load()
@@ -114,34 +101,7 @@ export function useJobs(templateId: string) {
       alive = false
       clearTimeout(timer)
     }
-  }, [templateId, version])
-
-  /** Reload now (and resume polling if work is pending). */
-  const refresh = useCallback(() => setVersion((v) => v + 1), [])
-
-  return { jobs, refresh }
-}
-
-/** The store owner's inbox. Reloads when the tab regains focus, so new photos show up. */
-export function useUploads() {
-  const [uploads, setUploads] = useState<Upload[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [version, setVersion] = useState(0)
-
-  useEffect(() => {
-    let alive = true
-    api<Upload[]>("/api/uploads").then(
-      (list) => {
-        if (!alive) return
-        setUploads(list)
-        setError(null)
-      },
-      (err: Error) => alive && setError(err.message),
-    )
-    return () => {
-      alive = false
-    }
-  }, [version])
+  }, [url, version])
 
   useEffect(() => {
     const onFocus = () => setVersion((v) => v + 1)
@@ -150,13 +110,48 @@ export function useUploads() {
   }, [])
 
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
+  return { data, error, refresh, setData }
+}
 
-  /** Apply a change locally before (or instead of) reloading. */
-  const update = useCallback((fn: (list: Upload[]) => Upload[]) => {
-    setUploads((list) => (list ? fn(list) : list))
-  }, [])
+const generating = (p: Product) => p.status === "generating"
 
-  return { uploads, error, refresh, update }
+export function useProducts() {
+  const { data, error, refresh } = usePolled<Product[]>("/api/products", (list) =>
+    list.some(generating),
+  )
+  return { products: data, error, refresh }
+}
+
+export function useProduct(id: string) {
+  const { data, error, refresh, setData } = usePolled<Product>(
+    `/api/products/${encodeURIComponent(id)}`,
+    generating,
+  )
+  return { product: data, error, refresh, setProduct: setData }
+}
+
+/** Download the Shopify CSV for these dresses (the server marks them exported). */
+export async function exportToShopify(ids: string[]) {
+  const res = await fetch("/api/products/export", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error ?? `Export failed (${res.status})`)
+  }
+  const name =
+    /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ??
+    "shopify-products.csv"
+  const url = URL.createObjectURL(await res.blob())
+  const a = document.createElement("a")
+  a.href = url
+  a.download = name
+  document.body.append(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
 
 /** Read width/height in the browser so we can show size and cost before uploading. */

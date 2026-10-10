@@ -4,7 +4,7 @@ import OpenAI, { APIConnectionError, APIError, toFile } from "openai"
 
 import { extForFormat, MIME_BY_FORMAT, readImageInfo } from "@/lib/image"
 import { MODEL_CAPS } from "@/lib/models"
-import type { TemplateSettings } from "@/lib/types"
+import type { PhotoView, TemplateSettings } from "@/lib/types"
 
 let client: OpenAI | undefined
 
@@ -24,10 +24,18 @@ export class EditError extends Error {
   name = "EditError"
 }
 
-/** Framing that tells the model which image provides what. Template prompt is appended. */
-export function composePrompt(templatePrompt: string) {
+/**
+ * Framing that tells the model which image provides what. Template prompt is appended.
+ * `view: "back"` stops the model "fixing" a back view into a front one.
+ */
+export function composePrompt(templatePrompt: string, view?: PhotoView) {
   return [
     "You are given two images.",
+    ...(view === "back"
+      ? [
+          "Image 1 shows the BACK of the garment. Keep it a back view: do not turn the person around or invent a front.",
+        ]
+      : []),
     "Image 1 is the SUBJECT photo. Keep the subject (person and/or product) exactly as it is: same face, hair, body, pose, garment, fabric, texture, color, pattern, print, logos and any text on the product. Do not restyle, recolor or redesign the subject.",
     "Image 2 is the BACKGROUND REFERENCE. Replace the background of image 1 with the scene from image 2: same location, setting, props, materials, color palette, lighting direction and color grading. Adapt the scene's perspective and framing naturally around the subject, and add consistent shadows and reflections so the subject sits in the scene realistically.",
     "Return a single photorealistic image.",
@@ -41,6 +49,7 @@ export async function editImage(opts: {
   source: Buffer
   reference: Buffer
   size: string
+  view?: PhotoView
 }): Promise<Buffer> {
   const { settings } = opts
   const caps = MODEL_CAPS[settings.model]
@@ -51,7 +60,7 @@ export async function editImage(opts: {
     const res = await getClient().images.edit({
       model: settings.model,
       image: [source, reference],
-      prompt: composePrompt(settings.prompt),
+      prompt: composePrompt(settings.prompt, opts.view),
       quality: settings.quality,
       size: opts.size,
       output_format: settings.outputFormat,

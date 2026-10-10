@@ -1,6 +1,11 @@
 import { defined, errorResponse, readJson, templateInput } from "@/lib/api"
 import { getStoredImage } from "@/lib/imagekit"
-import { deleteTemplate, getTemplate, updateTemplate } from "@/lib/store/templates"
+import {
+  deleteTemplate,
+  getTemplate,
+  setDefaultTemplate,
+  updateTemplate,
+} from "@/lib/store/templates"
 
 export async function GET(_req: Request, ctx: RouteContext<"/api/templates/[id]">) {
   try {
@@ -11,7 +16,10 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/templates/[id]"
   }
 }
 
-/** Partial update; `referenceFileId` swaps the background for a newly uploaded one. */
+/**
+ * Partial update; `referenceFileId` swaps the background for a newly uploaded one and
+ * `isDefault: true` makes this the template new dresses are generated with.
+ */
 export async function PATCH(request: Request, ctx: RouteContext<"/api/templates/[id]">) {
   try {
     const { id } = await ctx.params
@@ -20,6 +28,7 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/templates/
       typeof body.referenceFileId === "string"
         ? await getStoredImage(body.referenceFileId)
         : undefined
+    if (body.isDefault === true) await setDefaultTemplate(id)
     return Response.json(await updateTemplate(id, defined(templateInput(body)), reference))
   } catch (err) {
     return errorResponse(err)

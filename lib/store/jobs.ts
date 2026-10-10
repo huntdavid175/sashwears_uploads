@@ -2,16 +2,16 @@ import "server-only"
 
 import { randomUUID } from "node:crypto"
 
-import { getDb, iso, isoOrUndefined, isUniqueViolation } from "@/lib/db"
-import type { Dress, Job, StoredImage, Template } from "@/lib/types"
+import { getDb, iso, isoOrUndefined } from "@/lib/db"
+import type { Job, StoredImage, Template } from "@/lib/types"
 
 import { StoreError } from "./errors"
-import { isUuid, slugify } from "./templates"
+import { isUuid } from "./templates"
 
 /** A running job older than this was killed by the function timeout (300s) and is failed. */
 export const STALE_AFTER_SECONDS = 330
 
-export const STALE_MESSAGE = "Timed out or interrupted — retry"
+export const STALE_MESSAGE = "Timed out or interrupted — regenerate to try again"
 
 type Row = {
   id: string
@@ -19,7 +19,7 @@ type Row = {
   template_snapshot: Job["templateSnapshot"]
   original_name: string
   source: StoredImage
-  dress_id: string | null
+  photo_id: string | null
   size: string | null
   status: Job["status"]
   error: string | null
@@ -27,17 +27,7 @@ type Row = {
   created_at: unknown
   started_at: unknown
   finished_at: unknown
-  dress_name: string | null
-  dress_file_name: string | null
-  dress_image: StoredImage | null
-  dress_colors: string[] | null
-  dress_price: string | number | null
 }
-
-const SELECT = `
-  SELECT j.*, d.name AS dress_name, d.file_name AS dress_file_name, d.image AS dress_image,
-    d.colors AS dress_colors, d.price AS dress_price
-  FROM jobs j LEFT JOIN dresses d ON d.id = j.dress_id`
 
 function toJob(r: Row): Job {
   return {
@@ -46,12 +36,7 @@ function toJob(r: Row): Job {
     templateSnapshot: r.template_snapshot,
     originalName: r.original_name,
     source: r.source,
-    dressId: r.dress_id ?? undefined,
-    name: r.dress_name ?? undefined,
-    fileName: r.dress_file_name ?? undefined,
-    colors: r.dress_colors ?? [],
-    price: r.dress_price == null ? undefined : Number(r.dress_price),
-    output: r.status === "done" ? (r.dress_image ?? undefined) : undefined,
+    photoId: r.photo_id ?? undefined,
     size: r.size ?? undefined,
     status: r.status,
     error: r.error ?? undefined,
@@ -62,18 +47,9 @@ function toJob(r: Row): Job {
   }
 }
 
-export async function listJobs(filter: { templateId?: string } = {}): Promise<Job[]> {
-  if (filter.templateId && !isUuid(filter.templateId)) return []
-  const rows = await getDb().query<Row>(
-    `${SELECT} WHERE $1::uuid IS NULL OR j.template_id = $1 ORDER BY j.created_at DESC LIMIT 500`,
-    [filter.templateId ?? null],
-  )
-  return rows.map(toJob)
-}
-
 export async function getJob(id: string): Promise<Job> {
   if (!isUuid(id)) throw new StoreError("not_found", "Job not found")
-  const [row] = await getDb().query<Row>(`${SELECT} WHERE j.id = $1`, [id])
+  const [row] = await getDb().query<Row>("SELECT * FROM jobs WHERE id = $1", [id])
   if (!row) throw new StoreError("not_found", "Job not found")
   return toJob(row)
 }
@@ -81,7 +57,7 @@ export async function getJob(id: string): Promise<Job> {
 /** Build a queued job for a template from an image already on ImageKit. */
 export function newJob(
   template: Template,
-  input: { originalName: string; source: StoredImage; dressId?: string },
+  input: { originalName: string; source: StoredImage; photoId?: string },
 ): Job {
   const { name, slug, prompt, model, quality, outputFormat, reference } = template
   return {
@@ -90,8 +66,7 @@ export function newJob(
     templateSnapshot: { name, slug, prompt, model, quality, outputFormat, reference },
     originalName: input.originalName,
     source: input.source,
-    dressId: input.dressId,
-    colors: [],
+    photoId: input.photoId,
     status: "queued",
     attempts: 0,
     createdAt: new Date().toISOString(),
@@ -109,14 +84,14 @@ export async function addJobs(jobs: Job[]): Promise<void> {
       JSON.stringify(j.templateSnapshot),
       j.originalName,
       JSON.stringify(j.source),
-      j.dressId ?? null,
+      j.photoId ?? null,
       j.createdAt,
     )
     const p = (n: number) => `$${at + n}`
     return `(${p(1)}, ${p(2)}, ${p(3)}, ${p(4)}, ${p(5)}, ${p(6)}, 'queued', ${p(7)})`
   })
   await getDb().query(
-    `INSERT INTO jobs (id, template_id, template_snapshot, original_name, source, dress_id, status,
+    `INSERT INTO jobs (id, template_id, template_snapshot, original_name, source, photo_id, status,
        created_at) VALUES ${values.join(", ")}`,
     params,
   )
@@ -174,127 +149,4 @@ export async function finishJob(
       result.status === "failed" ? result.error : null,
     ],
   )
-}
-
-export async function setJobDress(id: string, dressId: string): Promise<void> {
-  await getDb().query("UPDATE jobs SET dress_id = $2 WHERE id = $1", [id, dressId])
-}
-
-/** Failed → queued again. */
-export async function requeueJob(id: string): Promise<Job> {
-  if (!isUuid(id)) throw new StoreError("not_found", "Job not found")
-  const rows = await getDb().query(
-    `UPDATE jobs SET status = 'queued', error = NULL, started_at = NULL, finished_at = NULL
-     WHERE id = $1 AND status = 'failed' RETURNING id`,
-    [id],
-  )
-  if (!rows.length) {
-    await getJob(id) // 404 if missing
-    throw new StoreError("invalid", "Only failed jobs can be retried")
-  }
-  return getJob(id)
-}
-
-// ---- Dresses -------------------------------------------------------------------------------
-
-type DressRow = {
-  id: string
-  name: string
-  file_name: string
-  image: StoredImage | null
-  colors: string[]
-  price: string | number | null
-}
-
-function toDress(r: DressRow): Dress {
-  return {
-    id: r.id,
-    name: r.name,
-    fileName: r.file_name,
-    image: r.image ?? undefined,
-    colors: r.colors,
-    price: r.price == null ? undefined : Number(r.price),
-  }
-}
-
-/** Colors and price are user-entered; `price: null` clears it. */
-export async function setDressDetails(
-  id: string,
-  details: { colors: string[]; price: number | null },
-): Promise<Dress> {
-  const [row] = await getDb().query<DressRow>(
-    "UPDATE dresses SET colors = $2, price = $3 WHERE id = $1 RETURNING *",
-    [id, details.colors, details.price],
-  )
-  if (!row) throw new StoreError("not_found", "Dress not found")
-  return toDress(row)
-}
-
-export async function getDress(id: string): Promise<Dress> {
-  const [row] = await getDb().query<DressRow>("SELECT * FROM dresses WHERE id = $1", [id])
-  if (!row) throw new StoreError("not_found", "Dress not found")
-  return toDress(row)
-}
-
-/** "Emerald Satin Wrap Dress" → "emerald-satin-wrap-dress", then "-2", "-3"… */
-function* fileNames(name: string) {
-  const base = slugify(name, "dress")
-  yield base
-  for (let n = 2; ; n++) yield `${base}-${n}`
-}
-
-/** Create a dress with a file name no other dress uses (the unique index settles races). */
-export async function createDress(name: string): Promise<Dress> {
-  for (const fileName of fileNames(name)) {
-    const [row] = await getDb().query<DressRow>(
-      `INSERT INTO dresses (id, name, file_name) VALUES ($1, $2, $3)
-       ON CONFLICT (file_name) DO NOTHING RETURNING *`,
-      [randomUUID(), name, fileName],
-    )
-    if (row) return toDress(row)
-  }
-  throw new Error("unreachable")
-}
-
-/**
- * The dress's file name for a new name: unchanged if it still slugifies to the same base,
- * otherwise the first free one. Doesn't write anything.
- */
-export async function planDressFileName(dress: Dress, name: string): Promise<string> {
-  const base = slugify(name, "dress")
-  if (dress.fileName === base || dress.fileName.replace(/-\d+$/, "") === base) {
-    return dress.fileName
-  }
-  const rows = await getDb().query<{ file_name: string }>(
-    `SELECT file_name FROM dresses
-     WHERE (file_name = $1 OR file_name LIKE $1 || '-%') AND id <> $2`,
-    [base, dress.id],
-  )
-  const taken = new Set(rows.map((r) => r.file_name))
-  for (const fileName of fileNames(name)) if (!taken.has(fileName)) return fileName
-  throw new Error("unreachable")
-}
-
-export async function saveDress(
-  id: string,
-  patch: { name?: string; fileName?: string; image?: StoredImage },
-): Promise<Dress> {
-  try {
-    const [row] = await getDb().query<DressRow>(
-      `UPDATE dresses SET name = COALESCE($2, name), file_name = COALESCE($3, file_name),
-         image = COALESCE($4, image)
-       WHERE id = $1 RETURNING *`,
-      [
-        id,
-        patch.name ?? null,
-        patch.fileName ?? null,
-        patch.image ? JSON.stringify(patch.image) : null,
-      ],
-    )
-    if (!row) throw new StoreError("not_found", "Dress not found")
-    return toDress(row)
-  } catch (err) {
-    if (isUniqueViolation(err)) throw new StoreError("conflict", "That file name was just taken")
-    throw err
-  }
 }

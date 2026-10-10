@@ -91,6 +91,26 @@ Legend: `[ ]` todo · `[x]` done
 - [x] Content capped at `max-w-6xl` on Uploads and Studio; checked in headless Edge (light/dark, 1600px and 500px)
 - [ ] **You:** push, then try an upload + download on the live app (and from a phone)
 
+## Phase 11 — Dresses (products) + Shopify export
+Spec: the store owner submits a **dress**: one price, the sizes it comes in, and colours. The first colour has a
+front **and** back photo; every other colour has a front photo only. Each colour has a quantity per size.
+Submitting generates every photo through the **default template** (one edit per photo). The AI names the
+dress (no colour in the name). Files: `<handle>-<colour>-<front|back>.<ext>` on ImageKit. Shopify CSV:
+Option1 = Color, Option2 = Size, one row per colour × size with price + quantity, each colour's front as its
+variant image, all photos as product images, `Status = draft`. Replaces the old Studio photo flow and the
+plain Uploads inbox (their tables stay; nothing is deleted).
+
+- [x] DB: `products`, `product_colors`, `product_photos`; `jobs.photo_id`; `templates.is_default`
+- [x] Worker: product photos (name once per product, view hint for backs, file naming, replace on regenerate)
+- [x] API: create / list / get / update (rename → ImageKit renames) / delete / regenerate photo / export CSV
+- [x] Owner page `/`: New dress form (sizes, price, colours, quantity grid, photo slots), recent submissions
+- [x] `/dresses` grid + `/dresses/[id]` detail (all images, before/after, regenerate, edit, download)
+- [x] `/settings`: templates (create / edit / delete / set default)
+- [x] Shopify CSV export (verified against Shopify's current product_template.csv, 2026-10-10)
+- [x] Remove old Studio/inbox UI + routes; tests (40) / lint / tsc / build; migration applied
+- [x] Push
+- [ ] **You:** set a default template, submit a real dress, import the CSV into Shopify as draft
+
 ---
 
 ## Assumptions

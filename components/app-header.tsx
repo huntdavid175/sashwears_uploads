@@ -17,8 +17,9 @@ import {
 import { useTheme, type ThemePreference } from "@/lib/theme"
 
 const NAV = [
-  { href: "/", label: "Uploads" },
-  { href: "/studio", label: "Studio" },
+  { href: "/", label: "New dress" },
+  { href: "/dresses", label: "Dresses" },
+  { href: "/settings", label: "Settings" },
 ] as const
 
 const THEMES = [
@@ -27,21 +28,27 @@ const THEMES = [
   { value: "system", label: "System", icon: MonitorIcon },
 ] as const
 
+/** Highlights the current section. Reads the path, so the layout renders it in <Suspense>. */
 export function AppHeader() {
-  const pathname = usePathname()
+  return <AppHeaderShell pathname={usePathname()} />
+}
 
+/** The header itself; `pathname: null` (the Suspense fallback) just highlights nothing. */
+export function AppHeaderShell({ pathname }: { pathname: string | null }) {
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-background">
-      <div className="flex h-14 items-center gap-4 px-4 md:px-8">
+      <div className="flex h-14 items-center gap-2 px-4 sm:gap-4 md:px-8">
         <Link
           href="/"
-          className="font-condensed shrink-0 text-lg font-semibold tracking-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="font-condensed hidden shrink-0 text-lg font-semibold tracking-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:inline"
         >
           Backdrop Studio
         </Link>
         <nav aria-label="Sections" className="flex items-center gap-1">
           {NAV.map((item) => {
-            const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
+            const active =
+              pathname !== null &&
+              (item.href === "/" ? pathname === "/" : pathname.startsWith(item.href))
             return (
               <Button
                 key={item.href}

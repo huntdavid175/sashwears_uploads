@@ -3,21 +3,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { storedImage, useTestDb } from "@/test/db"
 import { pngHeader } from "@/test/fixtures"
 
-const edit = vi.hoisted(() => ({ fail: false, calls: [] as { size: string }[] }))
+const edit = vi.hoisted(() => ({
+  fail: false,
+  calls: [] as { size: string; view?: string }[],
+}))
 
 vi.mock("@/lib/openai/edit", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/openai/edit")>()
   return {
     ...real,
-    editImage: async (opts: { size: string }) => {
-      edit.calls.push({ size: opts.size })
+    editImage: async (opts: { size: string; view?: string }) => {
+      edit.calls.push({ size: opts.size, view: opts.view })
       if (edit.fail) throw new real.EditError("boom")
       return pngHeader(1024, 1536)
     },
   }
 })
 
-const naming = vi.hoisted(() => ({ name: "Emerald Satin Wrap Dress", calls: 0 }))
+const naming = vi.hoisted(() => ({ name: "Satin Wrap Midi Dress", calls: 0 }))
 
 vi.mock("@/lib/openai/name", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/openai/name")>()
@@ -31,7 +34,6 @@ vi.mock("@/lib/openai/name", async (importOriginal) => {
 })
 
 const ik = vi.hoisted(() => ({
-  fail: false,
   uploads: [] as { folder: string; fileName: string; replace: boolean }[],
   renames: [] as { filePath: string; newFileName: string }[],
   deletes: [] as string[],
@@ -51,7 +53,6 @@ vi.mock("@/lib/imagekit", async (importOriginal) => {
     ...real,
     downloadImage: async () => pngHeader(800, 1200),
     uploadImage: async (opts: { folder: string; fileName: string; replace: boolean }) => {
-      if (ik.fail) throw new real.UploadError("ik down")
       ik.uploads.push({ folder: opts.folder, fileName: opts.fileName, replace: opts.replace })
       return file(`${opts.folder}/${opts.fileName}`)
     },
@@ -65,9 +66,8 @@ vi.mock("@/lib/imagekit", async (importOriginal) => {
   }
 })
 
-const { enqueue, regenerateJob, renameJob, retryJob, runNext, updateDress } =
-  await import("./queue")
-const { getJob, listJobs, newJob } = await import("./store/jobs")
+const { regeneratePhoto, runNext, updateProduct } = await import("./queue")
+const { createProduct, getProduct } = await import("./store/products")
 const { createTemplate, updateTemplate } = await import("./store/templates")
 
 let db: Awaited<ReturnType<typeof useTestDb>>
@@ -75,8 +75,8 @@ let db: Awaited<ReturnType<typeof useTestDb>>
 beforeEach(async () => {
   db = await useTestDb()
   Object.assign(edit, { fail: false, calls: [] })
-  Object.assign(naming, { name: "Emerald Satin Wrap Dress", calls: 0 })
-  Object.assign(ik, { fail: false, uploads: [], renames: [], deletes: [] })
+  Object.assign(naming, { name: "Satin Wrap Midi Dress", calls: 0 })
+  Object.assign(ik, { uploads: [], renames: [], deletes: [] })
 })
 
 afterEach(async () => {
@@ -88,125 +88,124 @@ async function drain() {
   while (await runNext()) {}
 }
 
-async function queueJobs(n: number) {
-  const t = await createTemplate(
+async function submitDress() {
+  const template = await createTemplate(
     { name: "Studio", prompt: "p", model: "gpt-image-1.5" },
     storedImage(),
   )
-  const jobs = Array.from({ length: n }, (_, i) =>
-    newJob(t, { originalName: `Dress ${i}.png`, source: storedImage(800, 1200) }),
+  const photo = (view: "front" | "back") => ({
+    view,
+    source: storedImage(800, 1200),
+    originalName: `${view}.jpg`,
+  })
+  const { product } = await createProduct(
+    {
+      price: 450,
+      sizes: ["S", "M"],
+      colors: [
+        { name: "Black", quantities: { S: 1, M: 2 }, photos: [photo("front"), photo("back")] },
+        { name: "Wine Red", quantities: { S: 0, M: 3 }, photos: [photo("front")] },
+      ],
+    },
+    template,
   )
-  await enqueue(jobs)
-  return { template: t, jobs }
+  return { template, product }
 }
 
-describe("queue", () => {
-  it("runs jobs: edits at the source's aspect, names each dress uniquely, uploads it", async () => {
-    await queueJobs(3)
+describe("dress generation", () => {
+  it("edits every photo, names the dress once, and uploads <dress>-<colour>-<view>", async () => {
+    const { product } = await submitDress()
     await drain()
 
-    const jobs = await listJobs()
-    expect(jobs.map((j) => j.status)).toEqual(Array(3).fill("done"))
+    const done = await getProduct(product.id)
+    expect(done).toMatchObject({ name: "Satin Wrap Midi Dress", handle: "satin-wrap-midi-dress" })
+    expect(done.status).toBe("ready")
+    expect(naming.calls).toBe(1)
+    expect(edit.calls.map((c) => c.view)).toEqual(["front", "back", "front"])
     expect(edit.calls.every((c) => c.size === "1024x1536")).toBe(true)
-    expect(jobs.map((j) => j.name)).toEqual(Array(3).fill("Emerald Satin Wrap Dress"))
-    expect(jobs.map((j) => j.fileName).sort()).toEqual([
-      "emerald-satin-wrap-dress",
-      "emerald-satin-wrap-dress-2",
-      "emerald-satin-wrap-dress-3",
+    expect(ik.uploads.map((u) => `${u.folder}/${u.fileName}`)).toEqual([
+      "/backdrop-studio/products/satin-wrap-midi-dress-black-front.png",
+      "/backdrop-studio/products/satin-wrap-midi-dress-black-back.png",
+      "/backdrop-studio/products/satin-wrap-midi-dress-wine-red-front.png",
     ])
-    expect(ik.uploads.every((u) => u.folder === "/backdrop-studio/studio" && !u.replace)).toBe(true)
-    for (const j of jobs) {
-      expect(j.output?.filePath).toBe(`/backdrop-studio/studio/${j.fileName}.png`)
-      expect(j.attempts).toBe(1)
-    }
+    expect(done.colors[1].photos[0].output?.filePath).toBe(
+      "/backdrop-studio/products/satin-wrap-midi-dress-wine-red-front.png",
+    )
   })
 
-  it("records failures; retry re-runs without naming the dress twice", async () => {
-    ik.fail = true
-    const { jobs } = await queueJobs(1)
+  it("marks failures; regenerating a photo replaces its file", async () => {
+    edit.fail = true
+    const { product } = await submitDress()
     await drain()
-    expect(await getJob(jobs[0].id)).toMatchObject({ status: "failed", error: "ik down" })
+    expect((await getProduct(product.id)).status).toBe("attention")
 
-    ik.fail = false
-    await retryJob(jobs[0].id)
+    edit.fail = false
+    const photo = product.colors[0].photos[0]
+    await regeneratePhoto(product.id, photo.id)
+    await expect(regeneratePhoto(product.id, photo.id)).rejects.toThrow(/already/)
     await drain()
-    expect(await getJob(jobs[0].id)).toMatchObject({ status: "done", attempts: 2 })
-    expect(naming.calls).toBe(1)
-  })
+    // The other two photos are still failed.
+    expect((await getProduct(product.id)).colors[0].photos[0].status).toBe("done")
 
-  it("regenerate keeps the dress and replaces the same ImageKit file", async () => {
-    const { jobs } = await queueJobs(1)
+    await regeneratePhoto(product.id, photo.id)
     await drain()
-    const fresh = await regenerateJob(jobs[0].id)
-    await drain()
-
-    expect(naming.calls).toBe(1)
-    expect(await getJob(fresh.id)).toMatchObject({
-      status: "done",
-      name: "Emerald Satin Wrap Dress",
-      fileName: "emerald-satin-wrap-dress",
-    })
-    expect(ik.uploads.at(-1)).toEqual({
-      folder: "/backdrop-studio/studio",
-      fileName: "emerald-satin-wrap-dress.png",
+    expect(ik.uploads.at(-1)).toMatchObject({
+      fileName: "satin-wrap-midi-dress-black-front.png",
       replace: true,
     })
     expect(ik.deletes).toEqual([])
   })
 
   it("a new output format writes a new file and deletes the old one", async () => {
-    const { template, jobs } = await queueJobs(1)
+    const { template, product } = await submitDress()
     await drain()
     await updateTemplate(template.id, { outputFormat: "webp" })
-    await regenerateJob(jobs[0].id)
+    await regeneratePhoto(product.id, product.colors[1].photos[0].id)
     await drain()
 
     expect(ik.uploads.at(-1)).toMatchObject({
-      fileName: "emerald-satin-wrap-dress.webp",
+      fileName: "satin-wrap-midi-dress-wine-red-front.webp",
       replace: false,
     })
-    expect(ik.deletes).toEqual(["id:/backdrop-studio/studio/emerald-satin-wrap-dress.png"])
-  })
-
-  it("renames a dress and its ImageKit file", async () => {
-    const { jobs } = await queueJobs(1)
-    await drain()
-
-    const renamed = await renameJob(jobs[0].id, "  Midnight Velvet Slip Dress ")
-    expect(renamed).toMatchObject({
-      name: "Midnight Velvet Slip Dress",
-      fileName: "midnight-velvet-slip-dress",
-    })
-    expect(renamed.output?.filePath).toBe("/backdrop-studio/studio/midnight-velvet-slip-dress.png")
-    expect(ik.renames).toEqual([
-      {
-        filePath: "/backdrop-studio/studio/emerald-satin-wrap-dress.png",
-        newFileName: "midnight-velvet-slip-dress.png",
-      },
+    expect(ik.deletes).toEqual([
+      "id:/backdrop-studio/products/satin-wrap-midi-dress-wine-red-front.png",
     ])
-    await expect(renameJob(jobs[0].id, "  ")).rejects.toThrow(/empty/)
   })
 
-  it("saves colors and price on the dress, shared with its regenerations", async () => {
-    const { jobs } = await queueJobs(1)
+  it("renaming the dress or a colour renames the files", async () => {
+    const { product } = await submitDress()
     await drain()
+    const [black, wine] = (await getProduct(product.id)).colors
 
-    const saved = await updateDress(jobs[0].id, { colors: "Black, Wine, black", price: "45.5" })
-    expect(saved).toMatchObject({ colors: ["Black", "Wine"], price: 45.5 })
-    expect(ik.renames).toEqual([])
-
-    const fresh = await regenerateJob(jobs[0].id)
-    await drain()
-    expect(await getJob(fresh.id)).toMatchObject({ colors: ["Black", "Wine"], price: 45.5 })
-
-    // Name + clearing the price in one save; colors left alone.
-    const renamed = await updateDress(jobs[0].id, { name: "Wine Maxi Dress", price: null })
-    expect(renamed).toMatchObject({ name: "Wine Maxi Dress", colors: ["Black", "Wine"] })
-    expect(renamed.price).toBeUndefined()
-    expect(ik.renames).toHaveLength(1)
-
-    await expect(updateDress(jobs[0].id, { price: "-3" })).rejects.toMatchObject({
-      code: "invalid",
+    const updated = await updateProduct(product.id, {
+      name: "Ruched Maxi Dress",
+      price: 500,
+      colors: [
+        { id: black.id, name: "Black", quantities: { S: 4, M: 4 } },
+        { id: wine.id, name: "Burgundy", quantities: { S: 0, M: 3 } },
+      ],
     })
+    expect(updated).toMatchObject({
+      name: "Ruched Maxi Dress",
+      handle: "ruched-maxi-dress",
+      price: 500,
+    })
+    expect(updated.colors[0].quantities).toEqual({ S: 4, M: 4 })
+    expect(ik.renames.map((r) => r.newFileName)).toEqual([
+      "ruched-maxi-dress-black-front.png",
+      "ruched-maxi-dress-black-back.png",
+      "ruched-maxi-dress-burgundy-front.png",
+    ])
+    expect(updated.colors[1].photos[0].output?.filePath).toBe(
+      "/backdrop-studio/products/ruched-maxi-dress-burgundy-front.png",
+    )
+
+    // Nothing to rename when only stock changes.
+    ik.renames = []
+    await updateProduct(product.id, {
+      colors: [{ id: black.id, name: "Black", quantities: { S: 0, M: 0 } }],
+    })
+    expect(ik.renames).toEqual([])
+    await expect(updateProduct(product.id, { name: "  " })).rejects.toThrow(/empty/)
   })
 })

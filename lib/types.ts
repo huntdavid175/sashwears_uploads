@@ -42,27 +42,15 @@ export type Template = TemplateSettings & {
   slug: string
   /** Background reference photo. */
   reference: StoredImage
+  /** The template new dresses are generated with. */
+  isDefault: boolean
   createdAt: string
   updatedAt: string
 }
 
 export type JobStatus = "queued" | "processing" | "done" | "failed"
 
-/** One product, named by the vision model. All runs of the same photo share it and its file. */
-export type Dress = {
-  id: string
-  /** e.g. "Emerald Satin Wrap Midi Dress" */
-  name: string
-  /** Unique file name stem, e.g. "emerald-satin-wrap-midi-dress" (or "-2", "-3"…). */
-  fileName: string
-  /** The latest result on ImageKit, at "<folder>/<fileName>.<ext>". */
-  image?: StoredImage
-  /** Colors it's available in, entered by the user. */
-  colors: string[]
-  /** Selling price in CURRENCY (lib/dress.ts), entered by the user. */
-  price?: number
-}
-
+/** One AI edit of one product photo. Regenerating a photo adds a new job for it. */
 export type Job = {
   id: string
   templateId: string
@@ -76,15 +64,8 @@ export type Job = {
   originalName: string
   /** The uploaded product photo. */
   source: StoredImage
-  /** Set once named. Regenerated jobs reuse it, so they replace the same ImageKit file. */
-  dressId?: string
-  /** From the dress, for display. */
-  name?: string
-  fileName?: string
-  colors: string[]
-  price?: number
-  /** The dress's current image on ImageKit, set when done. */
-  output?: StoredImage
+  /** The product photo this edit is for. */
+  photoId?: string
   /** Requested output size, e.g. "1024x1536". */
   size?: string
   status: JobStatus
@@ -95,16 +76,52 @@ export type Job = {
   finishedAt?: string
 }
 
-/** A photo the store owner uploaded for download (no editing). */
-export type Upload = {
+export const PHOTO_VIEWS = ["front", "back"] as const
+export type PhotoView = (typeof PHOTO_VIEWS)[number]
+
+export type ProductPhoto = {
   id: string
-  /** Photos uploaded together share a batch and its note. */
-  batchId: string
+  colorId: string
+  view: PhotoView
+  /** The store owner's photo. */
+  source: StoredImage
+  /** The edited result on ImageKit, at "<folder>/<handle>-<colour>-<view>.<ext>". */
+  output?: StoredImage
+  /** From the latest job for this photo. */
+  status: JobStatus
+  error?: string
+  startedAt?: string
+}
+
+export type ProductColor = {
+  id: string
+  name: string
+  position: number
+  /** Stock per size, e.g. { S: 2, M: 3 }. Missing sizes are 0. */
+  quantities: Record<string, number>
+  /** The first colour has front + back; the others front only. */
+  photos: ProductPhoto[]
+}
+
+/** generating: edits still running · attention: an edit failed · ready: every photo done. */
+export type ProductStatus = "generating" | "attention" | "ready"
+
+/** A dress, as one Shopify product: Color × Size variants with one price. */
+export type Product = {
+  id: string
+  /** AI-generated (no colour in it), editable. Unset until the first edit names it. */
+  name?: string
+  /** Shopify URL handle and file name stem, e.g. "satin-wrap-midi-dress". */
+  handle?: string
+  /** In CURRENCY (lib/dress.ts), same for every colour and size. */
+  price: number
+  /** In display order, e.g. ["S", "M", "L", "XL", "XXL"]. */
+  sizes: string[]
   note?: string
-  originalName: string
-  image: StoredImage
-  sizeBytes?: number
+  templateId?: string
+  exportedAt?: string
   createdAt: string
-  /** First time it was downloaded from the app. */
-  downloadedAt?: string
+  updatedAt: string
+  colors: ProductColor[]
+  status: ProductStatus
 }

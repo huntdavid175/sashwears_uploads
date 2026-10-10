@@ -1,5 +1,5 @@
-import { Inbox } from "@/components/uploads/inbox"
+import { NewDressPage } from "@/components/dresses/new-dress-form"
 
-export default function UploadsPage() {
-  return <Inbox />
+export default function Home() {
+  return <NewDressPage />
 }

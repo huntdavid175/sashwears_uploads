@@ -31,7 +31,7 @@ Before the final response, run one reporting pass. If candidates remain, from th
 
 ## Project: Backdrop Studio
 
-Hosted on **Vercel (Hobby)**, no sign-in. Two sections: **Uploads** (`/`) — the store owner drops raw photos that get downloaded for later work — and **Studio** (`/studio`). A **template** = one background reference photo + instructions + model settings. Every product photo run through a template keeps its subject exactly and gets the template's background, via the OpenAI Images Edit API (`[source, reference]` as inputs). A vision model names each dress; the result is stored on **ImageKit** under that name. Data lives in **Neon Postgres**. Spec and progress live in `plan.md` — tick its checkboxes as work completes.
+Hosted on **Vercel (Hobby)**, no sign-in. The store owner submits a **dress** on `/` (one price, the sizes it comes in, colours with stock per size; the first colour has a front + back photo, the others a front). Every photo is edited on submit through the **default template** (background reference + instructions + model settings) via the OpenAI Images Edit API (`[source, reference]` as inputs). A vision model names the dress (no colour in the name). Results go to **ImageKit** as `<dress>-<colour>-<front|back>.<ext>`; data in **Neon Postgres**. `/dresses` lists them, `/dresses/[id]` shows every photo, and dresses export as a **Shopify product CSV** (Color × Size variants). `/settings` manages templates. Spec and progress live in `plan.md` — tick its checkboxes as work completes.
 
 ### Commands
 
@@ -40,27 +40,29 @@ Hosted on **Vercel (Hobby)**, no sign-in. Two sections: **Uploads** (`/`) — th
 - `npm test` — Vitest (`lib/**/*.test.ts`, Postgres via in-memory PGlite); `npx tsc --noEmit`; `npm run lint`; `npx next build`
 - Run `npx next typegen` after adding routes so `RouteContext<...>` types exist for `tsc`
 
-### How a photo flows
+### How a dress flows
 
-1. Browser uploads originals / reference photos **straight to ImageKit** (`uploadToImageKit` in `lib/client.ts`, signed by `GET /api/imagekit/auth`) — Vercel caps request bodies at ~4.5MB, so files never pass through our functions.
-2. `POST /api/templates/[id]/jobs` gets `{ sources: [{ fileId, originalName }] }`, verifies each file via the ImageKit API, inserts queued jobs, and kicks the worker.
-3. `POST /api/worker` (`maxDuration = 300`) responds 202 and, in `after()`, claims one job (`claimNextJob`: advisory lock + max 2 processing), downloads source + reference (`?tr=orig-true`), runs the edit and naming in parallel, uploads to ImageKit, then kicks itself for the next job. `GET /api/jobs` (polled every 2s while work is active) fails timed-out jobs and re-kicks if anything is queued.
+1. Browser uploads the photos / template references **straight to ImageKit** (`uploadToImageKit` in `lib/client.ts`, signed by `GET /api/imagekit/auth`) — Vercel caps request bodies at ~4.5MB, so files never pass through our functions.
+2. `POST /api/products` validates the dress (`lib/dress.ts` rules), verifies each file via the ImageKit API, and inserts product + colours + photos + one queued job per photo in **one SQL statement** (`createProduct`), then kicks the worker.
+3. `POST /api/worker` (`maxDuration = 300`) responds 202 and, in `after()`, claims one job (`claimNextJob`: advisory lock + max 2 processing), downloads source + reference (`?tr=orig-true`), runs the edit (with a back-view hint for backs) and — if the dress is still unnamed — naming from the first colour's front, uploads to ImageKit, then kicks itself for the next job. `GET /api/products[/id]` (polled every 3s while a dress is generating) fails timed-out jobs and re-kicks if anything is queued.
+4. A photo's status is its **latest** job's status; a dress is generating / attention (a failed photo) / ready. Regenerate = a new job for that photo (replaces its file).
 
 ### Layout
 
-- `db/schema.sql` — tables `templates`, `dresses`, `jobs`. `lib/db.ts` — Neon HTTP client behind a tiny `query()` interface (`setDb` swaps in PGlite for tests; `test/db.ts`).
-- `lib/store/` — SQL repositories: `templates.ts`, `jobs.ts` (jobs + dresses). `errors.ts` — `StoreError` → HTTP status in `lib/api.ts`.
+- `db/schema.sql` — tables `templates` (`is_default`), `products`, `product_colors`, `product_photos`, `jobs` (`photo_id`). `dresses` and `uploads` are from earlier versions and unused (kept, not dropped). `lib/db.ts` — Neon HTTP client behind a tiny `query()` interface (`setDb` swaps in PGlite for tests; `test/db.ts`).
+- `lib/store/` — SQL repositories: `templates.ts`, `products.ts` (dresses, colours, photos), `jobs.ts`. `errors.ts` — `StoreError` → HTTP status in `lib/api.ts`.
 - `lib/models.ts` — per-model capabilities (sizes, `input_fidelity`, qualities) and token prices. **Update this when OpenAI models/prices change**; verify against the installed `openai` SDK types (`node_modules/openai/resources/images.d.ts`), not memory.
 - `lib/size.ts` — output size closest to the source aspect ratio, per model limits.
 - `lib/openai/edit.ts` — the edit call (no retries, 270s timeout to fit the function limit), prompt framing (`composePrompt`), SDK error → readable message.
 - `lib/openai/name.ts` — vision model names each dress from the source photo (never throws; falls back to the file name).
 - `lib/imagekit.ts` — browser upload auth, file lookup/validation, download, upload (exact path; `replace` = overwrite + purge), rename, delete.
-- `lib/dress.ts` — dress colors/price parsing + price formatting (client and server; currency from `NEXT_PUBLIC_CURRENCY`).
-- `lib/queue.ts` — `runNext` / `runJob`, regenerate, retry, `updateDress` (name/colors/price) and rename. `lib/api.ts` — `kickWorker` / `kickWorkerAfter`, error responses.
+- `lib/dress.ts` — dress input rules (sizes, colour names, quantities, price) shared by API and forms; price formatting (currency from `NEXT_PUBLIC_CURRENCY`).
+- `lib/queue.ts` — `runNext` / `runJob`, `regeneratePhoto`, `updateProduct` (renaming the dress or a colour renames its ImageKit files via `syncFileNames`).
+- `lib/shopify.ts` — Shopify product CSV (checked against Shopify's `product_template.csv`; re-check if Shopify changes its columns). `lib/api.ts` — `kickWorker` / `kickWorkerAfter`, error responses.
 - `components/app-header.tsx` — top bar: section nav + theme menu. `lib/theme.ts` / `lib/theme-script.ts` — light/dark/system (class `dark` on `<html>`, set before paint by an inline head script).
-- `components/uploads/inbox.tsx` + `lib/store/uploads.ts` + `app/api/uploads/**` — the store owner's inbox (ImageKit `_inbox` folder, `uploads` table, batches with notes, downloaded tracking).
-- `components/studio/` — the UI; `components/ui/` — shadcn (generated, don't hand-edit unless needed).
-- `lib/client.ts` — client fetch helper, `imageUrl` (ImageKit resize / download / cache-bust), `uploadToImageKit`, data hooks (`useTemplates`, `useJobs` with polling only while jobs are active).
+- `components/dresses/` — new-dress form (`/`), dress list + export dialog, dress detail, edit dialog, shared fields (photo slot, size picker, quantity grid). `components/settings/` — templates. `components/compare.tsx` — before/after slider.
+- `components/ui/` — shadcn `components/ui/` — shadcn (generated, don't hand-edit unless needed).
+- `lib/client.ts` — client fetch helper, `imageUrl` (ImageKit resize / download / cache-bust), `uploadToImageKit`, `exportToShopify`, data hooks (`useProducts`, `useProduct`, `useTemplates`; poll only while something is generating, reload on tab focus).
 
 ### Conventions and gotchas
 
@@ -73,7 +75,8 @@ Hosted on **Vercel (Hobby)**, no sign-in. Two sections: **Uploads** (`/`) — th
 - Cache Components is on: pages that read data must do so in client components or behind `<Suspense>`; `GET` handlers that don't read the request call `await connection()`.
 - In Route Handlers, read `request.url` (e.g. the origin for `kickWorker`) **before** any `try` whose `catch` calls `errorResponse` — otherwise the prerender bail-out gets caught and logged during `next build`.
 - No local disk on Vercel: never write files; everything persistent goes to Postgres or ImageKit.
-- A **dress** is one product: all runs of the same photo (regenerate) share its name, file name and single ImageKit file. File names are unique via the `dresses.file_name` unique index.
+- A **dress** is one Shopify product: `products.handle` (unique) is both the Shopify URL handle and the file-name stem. Colour names are unique per dress.
+- Client components that read the path/params (`usePathname`, `useParams`) need a `<Suspense>` boundary with Cache Components (the header is wrapped in the layout; `/dresses/[id]` wraps its page). Don't use random values (`crypto.randomUUID()`) during render — prerendering rejects them; and never put changing keys in element `id`s (hydration mismatch).
 - Schema changes go in `db/schema.sql` as idempotent statements (`ADD COLUMN IF NOT EXISTS`), then `npm run db:migrate`.
 - Postgres params: cast possibly-null params (`$1::uuid IS NULL`) or Postgres can't infer the type.
 - No sign-in by design: anyone with the URL can run edits (OpenAI spend) and get ImageKit upload signatures.

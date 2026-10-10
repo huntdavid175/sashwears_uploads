@@ -2,25 +2,23 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { storedImage, useTestDb } from "@/test/db"
 
+import { addJobs, claimNextJob, failStaleJobs, getJob, newJob, STALE_MESSAGE } from "./jobs"
 import {
-  addJobs,
-  claimNextJob,
-  createDress,
-  failStaleJobs,
-  getJob,
-  listJobs,
-  newJob,
-  planDressFileName,
-  requeueJob,
-  saveDress,
-  STALE_MESSAGE,
-} from "./jobs"
+  createProduct,
+  deleteProduct,
+  getProduct,
+  listProducts,
+  nameProductOnce,
+  planHandle,
+  type NewProductInput,
+} from "./products"
 import {
   createTemplate,
   deleteTemplate,
-  duplicateTemplate,
+  getDefaultTemplate,
   getTemplate,
   listTemplates,
+  setDefaultTemplate,
   slugify,
   updateTemplate,
 } from "./templates"
@@ -38,7 +36,7 @@ afterEach(async () => {
 const ref = () => storedImage(1024, 1024)
 
 describe("templates", () => {
-  it("creates with defaults, slug and reference", async () => {
+  it("creates with defaults, slug and reference; the first one is the default", async () => {
     const reference = ref()
     const t = await createTemplate({ name: "Beach Day", prompt: "sunny" }, reference)
     expect(t).toMatchObject({
@@ -48,8 +46,11 @@ describe("templates", () => {
       quality: "high",
       outputFormat: "png",
       reference,
+      isDefault: true,
     })
     expect(await getTemplate(t.id)).toEqual(t)
+    const second = await createTemplate({ name: "Studio", prompt: "p" }, ref())
+    expect(second.isDefault).toBe(false)
   })
 
   it("enforces required fields and case-insensitive unique names", async () => {
@@ -70,32 +71,25 @@ describe("templates", () => {
     ).rejects.toThrow(/doesn't support/)
   })
 
-  it("updates fields, keeps its own name, and swaps the reference", async () => {
+  it("updates fields, keeps its own name, swaps the reference, unique slugs", async () => {
     const t = await createTemplate({ name: "Studio", prompt: "p" }, ref())
     const next = ref()
     const u = await updateTemplate(t.id, { name: "studio", prompt: "new" }, next)
     expect(u).toMatchObject({ name: "studio", slug: "studio", prompt: "new", reference: next })
+    const other = await createTemplate({ name: "Other", prompt: "p" }, ref())
+    expect((await updateTemplate(other.id, { name: "Studio!" })).slug).toBe("studio-2")
   })
 
-  it("gives renamed templates unique slugs", async () => {
-    await createTemplate({ name: "Beach", prompt: "p" }, ref())
-    const t = await createTemplate({ name: "Other", prompt: "p" }, ref())
-    expect((await updateTemplate(t.id, { name: "Beach!" })).slug).toBe("beach-2")
-  })
-
-  it("duplicates with a unique copy name and the same reference", async () => {
-    const t = await createTemplate({ name: "Studio", prompt: "p" }, ref())
-    const a = await duplicateTemplate(t.id)
-    const b = await duplicateTemplate(t.id)
-    expect([a.name, b.name]).toEqual(["Studio (copy)", "Studio (copy 2)"])
-    expect(a.reference).toEqual(t.reference)
-  })
-
-  it("deletes, and treats bad ids as not found", async () => {
-    const t = await createTemplate({ name: "Studio", prompt: "p" }, ref())
-    await deleteTemplate(t.id)
-    expect(await listTemplates()).toEqual([])
-    await expect(getTemplate("nope")).rejects.toMatchObject({ code: "not_found" })
+  it("switches the default, falls back after deleting it, and errors with none", async () => {
+    await expect(getDefaultTemplate()).rejects.toThrow(/Settings/)
+    const a = await createTemplate({ name: "A", prompt: "p" }, ref())
+    const b = await createTemplate({ name: "B", prompt: "p" }, ref())
+    expect((await getDefaultTemplate()).id).toBe(a.id)
+    await setDefaultTemplate(b.id)
+    expect((await getDefaultTemplate()).id).toBe(b.id)
+    expect((await listTemplates()).map((t) => t.isDefault)).toEqual([true, false])
+    await deleteTemplate(b.id)
+    expect((await getDefaultTemplate()).id).toBe(a.id)
   })
 
   it("slugifies safely", () => {
@@ -105,18 +99,86 @@ describe("templates", () => {
   })
 })
 
-describe("jobs", () => {
-  it("snapshots the template so later edits don't change queued jobs", async () => {
-    const t = await createTemplate({ name: "Studio", prompt: "old" }, ref())
-    const job = newJob(t, { originalName: "a.png", source: storedImage() })
-    await addJobs([job])
-    await updateTemplate(t.id, { prompt: "new" })
-    const saved = await getJob(job.id)
-    expect(saved.templateSnapshot.prompt).toBe("old")
-    expect(saved).toMatchObject({ status: "queued", attempts: 0, source: job.source })
-    expect(await listJobs({ templateId: t.id })).toHaveLength(1)
+function dress(colors = 2): NewProductInput {
+  return {
+    price: 450,
+    sizes: ["S", "M", "L"],
+    colors: Array.from({ length: colors }, (_, i) => ({
+      name: ["Black", "Wine", "Emerald"][i],
+      quantities: { S: 1, M: 2, L: 0 },
+      photos: [
+        { view: "front" as const, source: storedImage(), originalName: `${i}-front.jpg` },
+        ...(i === 0
+          ? [{ view: "back" as const, source: storedImage(), originalName: "0-back.jpg" }]
+          : []),
+      ],
+    })),
+  }
+}
+
+describe("products", () => {
+  it("saves a dress with colours, photos and one queued job per photo", async () => {
+    const t = await createTemplate({ name: "Studio", prompt: "p" }, ref())
+    const { product, jobs } = await createProduct(dress(3), t)
+
+    expect(product).toMatchObject({ price: 450, sizes: ["S", "M", "L"], status: "generating" })
+    expect(product.name).toBeUndefined()
+    expect(product.colors.map((c) => c.name)).toEqual(["Black", "Wine", "Emerald"])
+    expect(product.colors.map((c) => c.photos.map((p) => p.view))).toEqual([
+      ["front", "back"],
+      ["front"],
+      ["front"],
+    ])
+    expect(product.colors[0].quantities).toEqual({ S: 1, M: 2, L: 0 })
+    expect(jobs).toHaveLength(4)
+    const job = await getJob(jobs[1].id)
+    expect(job).toMatchObject({ status: "queued", photoId: product.colors[0].photos[1].id })
+    expect((await listProducts()).map((p) => p.id)).toEqual([product.id])
   })
 
+  it("names once, with unique handles, and plans renames", async () => {
+    const t = await createTemplate({ name: "Studio", prompt: "p" }, ref())
+    const a = (await createProduct(dress(1), t)).product
+    const b = (await createProduct(dress(1), t)).product
+
+    expect((await nameProductOnce(a.id, "Wrap Dress")).handle).toBe("wrap-dress")
+    expect((await nameProductOnce(a.id, "Other Name")).name).toBe("Wrap Dress") // already named
+    expect((await nameProductOnce(b.id, "Wrap Dress")).handle).toBe("wrap-dress-2")
+
+    const named = await getProduct(a.id)
+    expect(await planHandle(named, "wrap dress!")).toBe("wrap-dress")
+    expect(await planHandle(named, "Maxi Dress")).toBe("maxi-dress")
+  })
+
+  it("derives status from the latest job of each photo", async () => {
+    const t = await createTemplate({ name: "Studio", prompt: "p" }, ref())
+    const { product } = await createProduct(dress(1), t)
+    await db.pg.query("UPDATE jobs SET status = 'done'")
+    expect((await getProduct(product.id)).status).toBe("ready")
+
+    // A newer failed job for one photo (e.g. a regenerate) wins over the old done one.
+    const photo = product.colors[0].photos[0]
+    await addJobs([
+      { ...newJob(t, { originalName: "x", source: photo.source, photoId: photo.id }) },
+    ])
+    await db.pg.query("UPDATE jobs SET status = 'failed', error = 'boom' WHERE status = 'queued'")
+    const p = await getProduct(product.id)
+    expect(p.status).toBe("attention")
+    expect(p.colors[0].photos[0]).toMatchObject({ status: "failed", error: "boom" })
+  })
+
+  it("deletes a dress with its colours, photos and jobs", async () => {
+    const t = await createTemplate({ name: "Studio", prompt: "p" }, ref())
+    const { product } = await createProduct(dress(2), t)
+    const photos = await deleteProduct(product.id)
+    expect(photos).toHaveLength(3)
+    expect(await listProducts()).toEqual([])
+    expect((await db.pg.query("SELECT * FROM jobs")).rows).toEqual([])
+    expect((await db.pg.query("SELECT * FROM product_photos")).rows).toEqual([])
+  })
+})
+
+describe("jobs", () => {
   it("claims oldest first, never more than the limit at once", async () => {
     const t = await createTemplate({ name: "Studio", prompt: "p" }, ref())
     const jobs = [1, 2, 3].map((i) =>
@@ -133,7 +195,7 @@ describe("jobs", () => {
     expect((await getJob(jobs[0].id)).attempts).toBe(1)
   })
 
-  it("fails jobs stuck in processing past the timeout, then they can be retried", async () => {
+  it("fails jobs stuck in processing past the timeout", async () => {
     const t = await createTemplate({ name: "Studio", prompt: "p" }, ref())
     const job = newJob(t, { originalName: "a.png", source: storedImage() })
     await addJobs([job])
@@ -142,28 +204,5 @@ describe("jobs", () => {
     await db.pg.query("UPDATE jobs SET started_at = now() - interval '10 minutes'")
     expect(await failStaleJobs()).toBe(1)
     expect(await getJob(job.id)).toMatchObject({ status: "failed", error: STALE_MESSAGE })
-
-    expect((await requeueJob(job.id)).status).toBe("queued")
-    await expect(requeueJob(job.id)).rejects.toThrow(/Only failed/)
-  })
-})
-
-describe("dresses", () => {
-  it("gives each dress a unique file name", async () => {
-    const names = await Promise.all([1, 2, 3].map(() => createDress("Red Silk Slip Dress")))
-    expect(names.map((d) => d.fileName).sort()).toEqual([
-      "red-silk-slip-dress",
-      "red-silk-slip-dress-2",
-      "red-silk-slip-dress-3",
-    ])
-  })
-
-  it("plans rename file names: unchanged base keeps it, taken ones get a suffix", async () => {
-    const a = await createDress("Blue Dress")
-    const b = await createDress("Green Dress")
-    expect(await planDressFileName(a, "blue dress!")).toBe("blue-dress")
-    expect(await planDressFileName(a, "Green Dress")).toBe("green-dress-2")
-    await saveDress(b.id, { name: "Teal Dress", fileName: "teal-dress" })
-    expect(await planDressFileName(a, "Green Dress")).toBe("green-dress")
   })
 })

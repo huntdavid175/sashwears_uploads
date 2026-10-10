@@ -62,3 +62,43 @@ CREATE TABLE IF NOT EXISTS uploads (
 );
 
 CREATE INDEX IF NOT EXISTS uploads_created_idx ON uploads (created_at DESC);
+
+-- Dresses (Shopify products): one price, sizes, colours; photos per colour (front, back).
+ALTER TABLE templates ADD COLUMN IF NOT EXISTS is_default boolean NOT NULL DEFAULT false;
+
+CREATE TABLE IF NOT EXISTS products (
+  id uuid PRIMARY KEY,
+  name text,
+  handle text UNIQUE,
+  price numeric(12, 2) NOT NULL,
+  sizes text[] NOT NULL,
+  note text,
+  template_id uuid,
+  exported_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS product_colors (
+  id uuid PRIMARY KEY,
+  product_id uuid NOT NULL REFERENCES products (id) ON DELETE CASCADE,
+  name text NOT NULL,
+  position integer NOT NULL,
+  quantities jsonb NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS product_colors_product_idx ON product_colors (product_id, position);
+
+CREATE TABLE IF NOT EXISTS product_photos (
+  id uuid PRIMARY KEY,
+  product_id uuid NOT NULL REFERENCES products (id) ON DELETE CASCADE,
+  color_id uuid NOT NULL REFERENCES product_colors (id) ON DELETE CASCADE,
+  view text NOT NULL,
+  source jsonb NOT NULL,
+  output jsonb,
+  UNIQUE (color_id, view)
+);
+
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS photo_id uuid;
+
+CREATE INDEX IF NOT EXISTS jobs_photo_idx ON jobs (photo_id, created_at DESC);

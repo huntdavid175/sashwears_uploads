@@ -32,6 +32,7 @@ type Row = {
   quality: Template["quality"]
   output_format: Template["outputFormat"]
   reference: StoredImage
+  is_default: boolean
   created_at: unknown
   updated_at: unknown
 }
@@ -46,13 +47,16 @@ function toTemplate(r: Row): Template {
     quality: r.quality,
     outputFormat: r.output_format,
     reference: r.reference,
+    isDefault: r.is_default,
     createdAt: iso(r.created_at),
     updatedAt: iso(r.updated_at),
   }
 }
 
 export async function listTemplates(): Promise<Template[]> {
-  const rows = await getDb().query<Row>("SELECT * FROM templates ORDER BY updated_at DESC")
+  const rows = await getDb().query<Row>(
+    "SELECT * FROM templates ORDER BY is_default DESC, updated_at DESC",
+  )
   return rows.map(toTemplate)
 }
 
@@ -71,8 +75,10 @@ export async function createTemplate(
   const slug = await uniqueSlug(fields.name)
   const rows = await saving(fields.name, () =>
     getDb().query<Row>(
-      `INSERT INTO templates (id, name, slug, prompt, model, quality, output_format, reference)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      `INSERT INTO templates (id, name, slug, prompt, model, quality, output_format, reference,
+         is_default)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOT EXISTS (SELECT 1 FROM templates))
+       RETURNING *`,
       [
         randomUUID(),
         fields.name,
@@ -119,19 +125,23 @@ export async function updateTemplate(
   return toTemplate(rows[0])
 }
 
-/** Copies settings; the copy shares the same reference file on ImageKit. */
-export async function duplicateTemplate(id: string): Promise<Template> {
-  const source = await getTemplate(id)
-  const all = await listTemplates()
-  let name = `${source.name} (copy)`
-  for (let n = 2; all.some((t) => sameName(t.name, name)); n++) {
-    name = `${source.name} (copy ${n})`
+/** The template new dresses are generated with: the marked default, else the only/newest one. */
+export async function getDefaultTemplate(): Promise<Template> {
+  const [row] = await getDb().query<Row>(
+    "SELECT * FROM templates ORDER BY is_default DESC, updated_at DESC LIMIT 1",
+  )
+  if (!row) {
+    throw new StoreError("invalid", "There's no template yet. Create one in Settings first.")
   }
-  const { prompt, model, quality, outputFormat } = source
-  return createTemplate({ name, prompt, model, quality, outputFormat }, source.reference)
+  return toTemplate(row)
 }
 
-/** Jobs and their results are kept, and so is the reference file (job snapshots point at it). */
+export async function setDefaultTemplate(id: string): Promise<void> {
+  await getTemplate(id)
+  await getDb().query("UPDATE templates SET is_default = (id = $1)", [id])
+}
+
+/** Jobs and dresses are kept, and so is the reference file (job snapshots point at it). */
 export async function deleteTemplate(id: string): Promise<void> {
   if (!isUuid(id)) throw new StoreError("not_found", "Template not found")
   const rows = await getDb().query("DELETE FROM templates WHERE id = $1 RETURNING id", [id])

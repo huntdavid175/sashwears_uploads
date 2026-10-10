@@ -1,29 +1,33 @@
 import { describe, expect, it } from "vitest"
 
-import { normalizeColors, parsePrice } from "./dress"
+import { normalizeColorName, normalizeQuantities, normalizeSizes, parsePrice } from "./dress"
 
-describe("normalizeColors", () => {
-  it("accepts a list or comma-separated text, trims, and drops blanks and repeats", () => {
-    expect(normalizeColors(" Black , emerald,, BLACK ,Wine ")).toEqual(["Black", "emerald", "Wine"])
-    expect(normalizeColors(["Navy  Blue", " ", "navy blue"])).toEqual(["Navy Blue"])
+describe("dress input", () => {
+  it("normalizes sizes: trims, drops blanks and repeats, keeps order", () => {
+    expect(normalizeSizes([" S", "m", "M", "", "XL "])).toEqual(["S", "m", "XL"])
+    expect(() => normalizeSizes([])).toThrow(/at least one/)
+    expect(() => normalizeSizes("S")).toThrow(/list/)
   })
 
-  it("rejects non-text and too many colors", () => {
-    expect(() => normalizeColors(42)).toThrow(/list/)
-    expect(() => normalizeColors([1])).toThrow(/text/)
-    expect(() => normalizeColors(Array.from({ length: 21 }, (_, i) => `c${i}`))).toThrow(/20/)
+  it("requires colour names", () => {
+    expect(normalizeColorName("  Wine   Red ")).toBe("Wine Red")
+    expect(() => normalizeColorName(" ")).toThrow(/name/)
   })
-})
 
-describe("parsePrice", () => {
-  it("treats blank as no price and rounds to cents", () => {
-    expect(parsePrice("")).toBeNull()
-    expect(parsePrice(null)).toBeNull()
+  it("keeps quantities for the given sizes only; blank is 0", () => {
+    expect(normalizeQuantities({ S: "2", M: "", L: 3, XS: 9 }, ["S", "M", "L"])).toEqual({
+      S: 2,
+      M: 0,
+      L: 3,
+    })
+    expect(() => normalizeQuantities({ S: "1.5" }, ["S"])).toThrow(/whole number/)
+    expect(() => normalizeQuantities({ S: -1 }, ["S"])).toThrow()
+  })
+
+  it("parses prices to cents and rejects blanks and negatives", () => {
     expect(parsePrice("1,250.456")).toBe(1250.46)
     expect(parsePrice(0)).toBe(0)
-  })
-
-  it("rejects negatives and non-numbers", () => {
+    expect(() => parsePrice("")).toThrow()
     expect(() => parsePrice("-5")).toThrow()
     expect(() => parsePrice("abc")).toThrow()
   })

@@ -33,10 +33,10 @@ export function imagekitFolder(templateSlug: string) {
 }
 
 /**
- * Where the browser uploads: originals to edit ("sources"), template backgrounds
- * ("references"), and the store owner's photos for download ("inbox").
+ * Where the browser uploads: dress photos to edit ("sources") and template backgrounds
+ * ("references").
  */
-export type UploadKind = "sources" | "references" | "inbox"
+export type UploadKind = "sources" | "references"
 
 export function uploadFolder(kind: UploadKind) {
   return `/${root()}/_${kind}`
@@ -57,7 +57,7 @@ const ACCEPTED_MIME = ["image/png", "image/jpeg", "image/webp"]
 
 /**
  * Look up a file the browser uploaded and check it's an image we can edit. With `anyImage`,
- * any image type passes (e.g. iPhone HEIC in the inbox) and dimensions may be unknown (0).
+ * any image type passes (e.g. iPhone HEIC) and dimensions may be unknown (0).
  */
 export async function getUploadedFile(
   fileId: string,
@@ -67,7 +67,7 @@ export async function getUploadedFile(
   try {
     file = await getClient().files.get(fileId)
   } catch (err) {
-    if (err instanceof APIError && err.status === 404) {
+    if (err instanceof APIError && (err.status === 404 || err.status === 400)) {
       throw new StoreError("invalid", "Uploaded image not found on ImageKit")
     }
     throw toUploadError(err)
