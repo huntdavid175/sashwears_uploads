@@ -28,6 +28,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { toast } from "@/components/ui/toast"
 import { exportToShopify, useProducts } from "@/lib/client"
+import { SHOPIFY_EXPORT } from "@/lib/features"
 import type { Product } from "@/lib/types"
 
 import { DressCard } from "./dress-card"
@@ -43,10 +44,12 @@ export function DressList() {
           <h1 className="text-2xl font-semibold tracking-tight">Dresses</h1>
           <p className="text-muted-foreground">Click a dress to see all its photos.</p>
         </div>
-        <Button onClick={() => setExporting(true)} disabled={!products?.length}>
-          <DownloadIcon data-icon="inline-start" />
-          Export to Shopify
-        </Button>
+        {SHOPIFY_EXPORT && (
+          <Button onClick={() => setExporting(true)} disabled={!products?.length}>
+            <DownloadIcon data-icon="inline-start" />
+            Export to Shopify
+          </Button>
+        )}
       </header>
 
       {error && !products ? (

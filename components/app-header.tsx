@@ -49,13 +49,15 @@ export function AppHeaderShell({ pathname }: { pathname: string | null }) {
             const active =
               pathname !== null &&
               (item.href === "/" ? pathname === "/" : pathname.startsWith(item.href))
+            // The current section gets a cobalt rule along the header's bottom edge.
             return (
               <Button
                 key={item.href}
                 size="sm"
-                variant={active ? "secondary" : "ghost"}
+                variant="ghost"
                 nativeButton={false}
                 render={<Link href={item.href} aria-current={active ? "page" : undefined} />}
+                className="relative aria-[current=page]:text-primary aria-[current=page]:after:absolute aria-[current=page]:after:inset-x-2.5 aria-[current=page]:after:-bottom-[18px] aria-[current=page]:after:h-0.5 aria-[current=page]:after:rounded-full aria-[current=page]:after:bg-primary"
               >
                 {item.label}
               </Button>
@@ -71,12 +73,16 @@ export function AppHeaderShell({ pathname }: { pathname: string | null }) {
 }
 
 function ThemeMenu() {
-  const { theme, setTheme } = useTheme()
-  const Current = THEMES.find((t) => t.value === theme)?.icon ?? MonitorIcon
+  const { theme, resolved, setTheme } = useTheme()
+  // Show what's on screen — sun or moon — whichever setting got it there.
+  const Current = resolved === "dark" ? MoonIcon : resolved === "light" ? SunIcon : MonitorIcon
+  const label = `Theme: ${resolved ?? "system"}${theme === "system" ? " (following system)" : ""}`
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button size="icon" variant="ghost" aria-label="Theme" />}>
+      <DropdownMenuTrigger
+        render={<Button size="icon" variant="ghost" aria-label={label} title={label} />}
+      >
         <Current />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

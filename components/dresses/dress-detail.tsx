@@ -40,6 +40,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { toast } from "@/components/ui/toast"
 import { api, exportToShopify, imageUrl, useProduct } from "@/lib/client"
+import { SHOPIFY_EXPORT } from "@/lib/features"
 import { formatPrice, totalStock } from "@/lib/dress"
 import type { Product, ProductColor, ProductPhoto } from "@/lib/types"
 
@@ -167,17 +168,19 @@ export function DressDetail() {
             <PencilIcon data-icon="inline-start" />
             Edit
           </Button>
-          <Button
-            onClick={exportThis}
-            disabled={product.status !== "ready" || !product.name || busy !== null}
-          >
-            {busy === "export" ? (
-              <Spinner data-icon="inline-start" />
-            ) : (
-              <UploadIcon data-icon="inline-start" />
-            )}
-            Export to Shopify
-          </Button>
+          {SHOPIFY_EXPORT && (
+            <Button
+              onClick={exportThis}
+              disabled={product.status !== "ready" || !product.name || busy !== null}
+            >
+              {busy === "export" ? (
+                <Spinner data-icon="inline-start" />
+              ) : (
+                <UploadIcon data-icon="inline-start" />
+              )}
+              Export to Shopify
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger
               render={<Button size="icon" variant="outline" aria-label="More" />}

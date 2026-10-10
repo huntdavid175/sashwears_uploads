@@ -33,9 +33,24 @@ function apply(preference: ThemePreference) {
   document.documentElement.style.colorScheme = dark ? "dark" : "light"
 }
 
-/** Light / dark / follow the system. Stored per browser; THEME_SCRIPT applies it before paint. */
+function subscribeSystem(onChange: () => void) {
+  const query = matchMedia(DARK_QUERY)
+  query.addEventListener("change", onChange)
+  return () => query.removeEventListener("change", onChange)
+}
+
+const systemIsDark = () => matchMedia(DARK_QUERY).matches
+
+/**
+ * Light / dark / follow the system. Stored per browser; THEME_SCRIPT applies it before paint.
+ * `resolved` is what's actually on screen (the system's choice when following it); it's null
+ * until hydrated, since the server can't know.
+ */
 export function useTheme() {
   const theme = useSyncExternalStore(subscribe, read, () => "system" as const)
+  const systemDark = useSyncExternalStore(subscribeSystem, systemIsDark, () => null)
+  const resolved: "light" | "dark" | null =
+    theme !== "system" ? theme : systemDark === null ? null : systemDark ? "dark" : "light"
 
   useEffect(() => {
     apply(theme)
@@ -57,5 +72,5 @@ export function useTheme() {
     window.dispatchEvent(new Event(CHANGE_EVENT))
   }, [])
 
-  return { theme, setTheme }
+  return { theme, resolved, setTheme }
 }
