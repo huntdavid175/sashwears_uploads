@@ -1,7 +1,25 @@
 /** Dress input rules shared by the API (validation) and the UI (forms, formatting). */
 
-/** Currency for prices. Set NEXT_PUBLIC_CURRENCY (ISO code, e.g. "GHS") to change it. */
-export const CURRENCY = process.env.NEXT_PUBLIC_CURRENCY || "USD"
+/** Currency for prices: Ghana cedis. NEXT_PUBLIC_CURRENCY (ISO code) overrides it. */
+export const CURRENCY = process.env.NEXT_PUBLIC_CURRENCY || "GHS"
+
+// Fixed locale + narrow symbol: "GH₵450.00" everywhere (the default locale shows "GHS 450.00"),
+// and server and browser format identically.
+const money = (() => {
+  try {
+    return new Intl.NumberFormat("en-GH", {
+      style: "currency",
+      currency: CURRENCY,
+      currencyDisplay: "narrowSymbol",
+    })
+  } catch {
+    return null
+  }
+})()
+
+/** The currency's symbol for labels, e.g. "GH₵". */
+export const CURRENCY_SYMBOL =
+  money?.formatToParts(0).find((p) => p.type === "currency")?.value ?? CURRENCY
 
 export const DEFAULT_SIZES = ["S", "M", "L", "XL", "XXL"]
 export const MAX_SIZES = 20
@@ -62,13 +80,7 @@ export function parsePrice(value: unknown): number {
 }
 
 export function formatPrice(amount: number) {
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency: CURRENCY }).format(
-      amount,
-    )
-  } catch {
-    return `${CURRENCY} ${amount.toFixed(2)}`
-  }
+  return money ? money.format(amount) : `${CURRENCY} ${amount.toFixed(2)}`
 }
 
 export function totalStock(quantities: Record<string, number>, sizes: string[]) {

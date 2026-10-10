@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { CURRENCY, DEFAULT_SIZES } from "@/lib/dress"
+import { CURRENCY_SYMBOL, DEFAULT_SIZES } from "@/lib/dress"
 
 import { SizePicker } from "./fields"
 
@@ -53,7 +53,7 @@ export function DressBasicsCard({
       <CardContent>
         <FieldGroup>
           <Field data-invalid={priceMissing}>
-            <FieldLabel htmlFor={`${id}-price`}>Price ({CURRENCY})</FieldLabel>
+            <FieldLabel htmlFor={`${id}-price`}>Price ({CURRENCY_SYMBOL})</FieldLabel>
             <Input
               id={`${id}-price`}
               value={basics.price}

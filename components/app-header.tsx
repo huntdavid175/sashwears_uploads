@@ -14,13 +14,14 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { SETTINGS_PAGE } from "@/lib/features"
 import { useTheme, type ThemePreference } from "@/lib/theme"
 
 const NAV = [
   { href: "/", label: "Upload" },
   { href: "/dresses", label: "Dresses" },
-  { href: "/settings", label: "Settings" },
-] as const
+  ...(SETTINGS_PAGE ? [{ href: "/settings", label: "Settings" }] : []),
+]
 
 const THEMES = [
   { value: "light", label: "Light", icon: SunIcon },

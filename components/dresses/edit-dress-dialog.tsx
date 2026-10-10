@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Spinner } from "@/components/ui/spinner"
 import { api } from "@/lib/client"
-import { CURRENCY, DEFAULT_SIZES } from "@/lib/dress"
+import { CURRENCY_SYMBOL, DEFAULT_SIZES } from "@/lib/dress"
 import type { Product } from "@/lib/types"
 
 import { QuantityGrid, SizePicker } from "./fields"
@@ -122,7 +122,7 @@ function EditForm({ product, onSaved }: { product: Product; onSaved: (p: Product
           />
         </Field>
         <Field>
-          <FieldLabel htmlFor={`${id}-price`}>Price ({CURRENCY})</FieldLabel>
+          <FieldLabel htmlFor={`${id}-price`}>Price ({CURRENCY_SYMBOL})</FieldLabel>
           <Input
             id={`${id}-price`}
             value={price}

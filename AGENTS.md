@@ -69,7 +69,7 @@ Hosted on **Vercel (Hobby)**, no sign-in. The store owner uploads a dress on `/`
 
 - **shadcn uses Base UI, not Radix**: `render={<Button />}` instead of `asChild`; Select needs an `items` prop; ToggleGroup values are arrays; toasts are `toast.add({ title, type })` from `@/components/ui/toast`. Load the `shadcn` skill before UI work. `cn` comes from the `cn` npm package via `@/lib/utils`.
 - Design direction is "grey-card studio": neutral grey canvas, white panels, one cobalt accent (`--primary`), Archivo with `font-condensed` reserved for template names. Dark mode keeps the idea (deep neutral grey, lifted panels, lighter cobalt). Use semantic tokens from `app/globals.css`, never raw colors or `dark:` overrides. Page content is capped at `max-w-6xl`. Selected states are cobalt: pressed toggles fill with `--primary` (edited in `components/ui/toggle.tsx`), the current nav section gets a cobalt underline. The theme button shows the mode on screen (sun/moon), not the setting.
-- `lib/features.ts` — switches for built-but-hidden features (`SHOPIFY_EXPORT` is off for now; the export API still works).
+- `lib/features.ts` — switches for built-but-hidden features (`SHOPIFY_EXPORT` and `SETTINGS_PAGE` are off for now; their APIs still work, and new dresses use the existing default template).
 - Headless Edge on Windows won't lay out narrower than ~500px; check mobile at 500 wide.
 - Code style: no semicolons, double quotes, 100-column lines (`npx prettier --no-semi --print-width 100`).
 - React 19 lint rules are strict: no synchronous `setState` in effects, no ref access during render. Load data inside effects via promise callbacks; remount forms with `key`/conditional rendering instead of reset effects.

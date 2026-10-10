@@ -30,15 +30,14 @@ export function coverImage(product: Product) {
   return front?.output ?? front?.source
 }
 
-export function DressCard({ product, highlight }: { product: Product; highlight?: boolean }) {
+export function DressCard({ product }: { product: Product }) {
   const cover = coverImage(product)
   const stock = product.colors.reduce((sum, c) => sum + totalStock(c.quantities, product.sizes), 0)
 
   return (
     <Link
       href={`/dresses/${product.id}`}
-      className="group flex flex-col overflow-hidden rounded-xl bg-card text-card-foreground ring-1 ring-border outline-none hover:ring-primary focus-visible:ring-3 focus-visible:ring-ring/50 data-[highlight]:ring-2 data-[highlight]:ring-primary"
-      data-highlight={highlight || undefined}
+      className="group flex flex-col overflow-hidden rounded-xl bg-card text-card-foreground ring-1 ring-border outline-none hover:ring-primary focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       <div className="aspect-[3/4] bg-muted">
         {cover && (

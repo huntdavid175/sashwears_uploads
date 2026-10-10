@@ -32,3 +32,11 @@ describe("dress input", () => {
     expect(() => parsePrice("abc")).toThrow()
   })
 })
+
+describe("prices in cedis", () => {
+  it("formats with the cedi symbol", async () => {
+    const { formatPrice, CURRENCY_SYMBOL } = await import("./dress")
+    expect(CURRENCY_SYMBOL).toBe("GH₵")
+    expect(formatPrice(1250.5)).toBe("GH₵1,250.50")
+  })
+})

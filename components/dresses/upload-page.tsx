@@ -4,11 +4,9 @@ import { CheckCircle2Icon, WandSparklesIcon } from "lucide-react"
 import { useState } from "react"
 
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import type { Product } from "@/lib/types"
 
 import { CompletedDressForm } from "./completed-dress-form"
 import { GeneratedDressForm } from "./generated-dress-form"
-import { RecentDresses } from "./recent-dresses"
 
 type Kind = "completed" | "generate"
 
@@ -24,10 +22,8 @@ export function UploadPage() {
   const [kind, setKind] = useState<Kind>("completed")
   // Remounting the form (new key) after a save clears it without reset effects.
   const [formKey, setFormKey] = useState(0)
-  const [lastSaved, setLastSaved] = useState<Product | null>(null)
 
-  function saved(product: Product) {
-    setLastSaved(product)
+  function saved() {
     setFormKey((k) => k + 1)
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
@@ -67,8 +63,6 @@ export function UploadPage() {
       ) : (
         <GeneratedDressForm key={formKey} onSubmitted={saved} />
       )}
-
-      <RecentDresses highlight={lastSaved?.id} />
     </main>
   )
 }
