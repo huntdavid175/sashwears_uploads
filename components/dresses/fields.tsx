@@ -169,6 +169,9 @@ export function QuantityGrid({
   /** Prefix for each input's accessible name, e.g. the colour. */
   label: string
 }) {
+  if (!sizes.length) {
+    return <p className="text-sm text-muted-foreground">Pick the sizes above first.</p>
+  }
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2">
       {sizes.map((size) => (

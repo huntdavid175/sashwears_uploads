@@ -14,7 +14,8 @@ import { SizePicker } from "./fields"
 export function useDressBasics() {
   const [price, setPrice] = useState("")
   const [sizeOptions, setSizeOptions] = useState(DEFAULT_SIZES)
-  const [sizes, setSizes] = useState(DEFAULT_SIZES)
+  // Nothing picked at first: the owner chooses the sizes this dress actually comes in.
+  const [sizes, setSizes] = useState<string[]>([])
   const [note, setNote] = useState("")
   return {
     price,
@@ -64,7 +65,7 @@ export function DressBasicsCard({
               className="max-w-48"
             />
           </Field>
-          <Field>
+          <Field data-invalid={attempted && !basics.sizes.length ? true : undefined}>
             <FieldLabel>Sizes it comes in</FieldLabel>
             <SizePicker
               options={basics.sizeOptions}
