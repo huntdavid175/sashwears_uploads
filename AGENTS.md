@@ -55,7 +55,8 @@ Hosted on **Vercel (Hobby)**, no sign-in. A **template** = one background refere
 - `lib/openai/edit.ts` — the edit call (no retries, 270s timeout to fit the function limit), prompt framing (`composePrompt`), SDK error → readable message.
 - `lib/openai/name.ts` — vision model names each dress from the source photo (never throws; falls back to the file name).
 - `lib/imagekit.ts` — browser upload auth, file lookup/validation, download, upload (exact path; `replace` = overwrite + purge), rename, delete.
-- `lib/queue.ts` — `runNext` / `runJob`, regenerate, retry, rename. `lib/api.ts` — `kickWorker` / `kickWorkerAfter`, error responses.
+- `lib/dress.ts` — dress colors/price parsing + price formatting (client and server; currency from `NEXT_PUBLIC_CURRENCY`).
+- `lib/queue.ts` — `runNext` / `runJob`, regenerate, retry, `updateDress` (name/colors/price) and rename. `lib/api.ts` — `kickWorker` / `kickWorkerAfter`, error responses.
 - `components/studio/` — the UI; `components/ui/` — shadcn (generated, don't hand-edit unless needed).
 - `lib/client.ts` — client fetch helper, `imageUrl` (ImageKit resize / download / cache-bust), `uploadToImageKit`, data hooks (`useTemplates`, `useJobs` with polling only while jobs are active).
 
@@ -70,6 +71,7 @@ Hosted on **Vercel (Hobby)**, no sign-in. A **template** = one background refere
 - In Route Handlers, read `request.url` (e.g. the origin for `kickWorker`) **before** any `try` whose `catch` calls `errorResponse` — otherwise the prerender bail-out gets caught and logged during `next build`.
 - No local disk on Vercel: never write files; everything persistent goes to Postgres or ImageKit.
 - A **dress** is one product: all runs of the same photo (regenerate) share its name, file name and single ImageKit file. File names are unique via the `dresses.file_name` unique index.
+- Schema changes go in `db/schema.sql` as idempotent statements (`ADD COLUMN IF NOT EXISTS`), then `npm run db:migrate`.
 - Postgres params: cast possibly-null params (`$1::uuid IS NULL`) or Postgres can't infer the type.
 - No sign-in by design: anyone with the URL can run edits (OpenAI spend) and get ImageKit upload signatures.
 - **Windows**: stopping a background `next dev` task can leave its node child processes running; check with `Get-CimInstance Win32_Process` and confirm the port is free.

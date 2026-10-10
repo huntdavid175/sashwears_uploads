@@ -1,14 +1,15 @@
 import { errorResponse, readJson } from "@/lib/api"
-import { renameJob } from "@/lib/queue"
-import { StoreError } from "@/lib/store/errors"
+import { updateDress } from "@/lib/queue"
 
-/** Rename a dress: `{ name }`. Renames its ImageKit file too. */
+/**
+ * Edit the job's dress: `{ name?, colors?, price? }`. A new name also renames the ImageKit file;
+ * `colors` is a list (or comma-separated text); `price: null` or "" clears it.
+ */
 export async function PATCH(request: Request, ctx: RouteContext<"/api/jobs/[id]">) {
   try {
     const { id } = await ctx.params
-    const body = await readJson(request)
-    if (typeof body.name !== "string") throw new StoreError("invalid", "Send { name }")
-    return Response.json(await renameJob(id, body.name))
+    const { name, colors, price } = await readJson(request)
+    return Response.json(await updateDress(id, { name, colors, price }))
   } catch (err) {
     return errorResponse(err)
   }

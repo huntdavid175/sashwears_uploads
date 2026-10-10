@@ -29,6 +29,7 @@ import { api, imageUrl, useJobs } from "@/lib/client"
 import { MODEL_CAPS } from "@/lib/models"
 import type { Job, Template } from "@/lib/types"
 
+import type { DressInput } from "./dress-dialog"
 import { JobCard } from "./job-card"
 import { TemplateDialog } from "./template-dialog"
 import { UploadTray } from "./upload-tray"
@@ -91,17 +92,17 @@ export function Workbench({
     }
   }
 
-  async function renameJob(job: Job, name: string) {
+  async function saveDress(job: Job, input: DressInput) {
     try {
       await api(`/api/jobs/${job.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify(input),
       })
       void refresh()
       return true
     } catch (err) {
-      toast.add({ type: "error", title: "Couldn't rename", description: (err as Error).message })
+      toast.add({ type: "error", title: "Couldn't save", description: (err as Error).message })
       return false
     }
   }
@@ -200,7 +201,7 @@ export function Workbench({
                 job={job}
                 onRetry={(j) => jobAction(j, "retry")}
                 onRegenerate={(j) => jobAction(j, "regenerate")}
-                onRename={renameJob}
+                onSaveDress={saveDress}
               />
             ))}
           </div>

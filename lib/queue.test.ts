@@ -65,7 +65,8 @@ vi.mock("@/lib/imagekit", async (importOriginal) => {
   }
 })
 
-const { enqueue, regenerateJob, renameJob, retryJob, runNext } = await import("./queue")
+const { enqueue, regenerateJob, renameJob, retryJob, runNext, updateDress } =
+  await import("./queue")
 const { getJob, listJobs, newJob } = await import("./store/jobs")
 const { createTemplate, updateTemplate } = await import("./store/templates")
 
@@ -90,10 +91,10 @@ async function drain() {
 async function queueJobs(n: number) {
   const t = await createTemplate(
     { name: "Studio", prompt: "p", model: "gpt-image-1.5" },
-    storedImage()
+    storedImage(),
   )
   const jobs = Array.from({ length: n }, (_, i) =>
-    newJob(t, { originalName: `Dress ${i}.png`, source: storedImage(800, 1200) })
+    newJob(t, { originalName: `Dress ${i}.png`, source: storedImage(800, 1200) }),
   )
   await enqueue(jobs)
   return { template: t, jobs }
@@ -184,5 +185,28 @@ describe("queue", () => {
       },
     ])
     await expect(renameJob(jobs[0].id, "  ")).rejects.toThrow(/empty/)
+  })
+
+  it("saves colors and price on the dress, shared with its regenerations", async () => {
+    const { jobs } = await queueJobs(1)
+    await drain()
+
+    const saved = await updateDress(jobs[0].id, { colors: "Black, Wine, black", price: "45.5" })
+    expect(saved).toMatchObject({ colors: ["Black", "Wine"], price: 45.5 })
+    expect(ik.renames).toEqual([])
+
+    const fresh = await regenerateJob(jobs[0].id)
+    await drain()
+    expect(await getJob(fresh.id)).toMatchObject({ colors: ["Black", "Wine"], price: 45.5 })
+
+    // Name + clearing the price in one save; colors left alone.
+    const renamed = await updateDress(jobs[0].id, { name: "Wine Maxi Dress", price: null })
+    expect(renamed).toMatchObject({ name: "Wine Maxi Dress", colors: ["Black", "Wine"] })
+    expect(renamed.price).toBeUndefined()
+    expect(ik.renames).toHaveLength(1)
+
+    await expect(updateDress(jobs[0].id, { price: "-3" })).rejects.toMatchObject({
+      code: "invalid",
+    })
   })
 })

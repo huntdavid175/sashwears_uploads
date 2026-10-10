@@ -9,6 +9,7 @@ import {
   uploadImage,
 } from "@/lib/imagekit"
 import { editImage, toEditError } from "@/lib/openai/edit"
+import { normalizeColors, parsePrice } from "@/lib/dress"
 import { cleanName, nameProduct } from "@/lib/openai/name"
 import { pickSize } from "@/lib/size"
 import { StoreError } from "@/lib/store/errors"
@@ -25,6 +26,7 @@ import {
   planDressFileName,
   requeueJob,
   saveDress,
+  setDressDetails,
   setJobDress,
 } from "@/lib/store/jobs"
 import { getTemplate } from "@/lib/store/templates"
@@ -127,6 +129,42 @@ async function nameNewDress(job: Job, source: Buffer) {
   const dress = await createDress(await nameProduct(source, job.originalName))
   await setJobDress(job.id, dress.id)
   return dress
+}
+
+/**
+ * Edit a dress from one of its jobs: any of `name` (renames the ImageKit file too), `colors`
+ * (list or comma-separated) and `price` (blank/null clears it).
+ */
+export async function updateDress(
+  id: string,
+  input: { name?: unknown; colors?: unknown; price?: unknown },
+): Promise<Job> {
+  const job = await getJob(id)
+  if (!job.dressId) throw new StoreError("invalid", "This photo hasn't been named yet")
+  const invalid = (fn: () => void) => {
+    try {
+      fn()
+    } catch (err) {
+      throw new StoreError("invalid", (err as Error).message)
+    }
+  }
+  let colors: string[] | undefined
+  let price: number | null | undefined
+  invalid(() => {
+    if (input.colors !== undefined) colors = normalizeColors(input.colors)
+    if (input.price !== undefined) price = parsePrice(input.price)
+  })
+  if (input.name !== undefined && input.name !== job.name) {
+    if (typeof input.name !== "string") throw new StoreError("invalid", "Name must be text")
+    await renameJob(id, input.name)
+  }
+  if (colors !== undefined || price !== undefined) {
+    await setDressDetails(job.dressId, {
+      colors: colors ?? job.colors,
+      price: price === undefined ? (job.price ?? null) : price,
+    })
+  }
+  return getJob(id)
 }
 
 /** Rename a dress: its name, its file name, and its file on ImageKit. */

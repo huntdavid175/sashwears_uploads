@@ -4,6 +4,7 @@ import {
   DownloadIcon,
   ExternalLinkIcon,
   PencilIcon,
+  PlusIcon,
   RefreshCwIcon,
   RotateCcwIcon,
 } from "lucide-react"
@@ -19,11 +20,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { imageUrl } from "@/lib/client"
+import { formatPrice } from "@/lib/dress"
 import type { Job } from "@/lib/types"
+
+import { DressDialog, type DressInput } from "./dress-dialog"
 
 /** Card previews are ~15rem wide; 2x for sharp screens. */
 const PREVIEW_WIDTH = 640
@@ -39,50 +42,41 @@ export function JobCard({
   job,
   onRetry,
   onRegenerate,
-  onRename,
+  onSaveDress,
 }: {
   job: Job
   onRetry: (job: Job) => void
   onRegenerate: (job: Job) => void
-  /** Resolves true once saved, so the editor can close. */
-  onRename: (job: Job, name: string) => Promise<boolean>
+  /** Resolves true once saved, so the dialog can close. */
+  onSaveDress: (job: Job, input: DressInput) => Promise<boolean>
 }) {
   const aspect = job.size ? aspectOf(job.size) : `${job.source.width} / ${job.source.height}`
-  const [renaming, setRenaming] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const editable = Boolean(job.dressId) && job.status !== "processing"
 
   return (
     <Card size="sm" className="gap-3">
       <CardHeader className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          {renaming ? (
-            <RenameForm
-              initial={job.name ?? ""}
-              onCancel={() => setRenaming(false)}
-              onSave={async (name) => {
-                if (await onRename(job, name)) setRenaming(false)
-              }}
-            />
-          ) : (
-            <div className="flex min-w-0 items-center gap-1">
-              <CardTitle
-                className="truncate text-sm font-medium"
-                title={job.name ?? job.originalName}
+          <div className="flex min-w-0 items-center gap-1">
+            <CardTitle
+              className="truncate text-sm font-medium"
+              title={job.name ?? job.originalName}
+            >
+              {job.name ?? job.originalName}
+            </CardTitle>
+            {editable && (
+              <Button
+                size="icon-xs"
+                variant="ghost"
+                aria-label="Edit dress details"
+                title="Edit name, colors and price"
+                onClick={() => setEditing(true)}
               >
-                {job.name ?? job.originalName}
-              </CardTitle>
-              {job.name && job.status !== "processing" && (
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  aria-label="Rename"
-                  title="Rename (also renames the file on ImageKit)"
-                  onClick={() => setRenaming(true)}
-                >
-                  <PencilIcon />
-                </Button>
-              )}
-            </div>
-          )}
+                <PencilIcon />
+              </Button>
+            )}
+          </div>
           {job.name && (
             <CardDescription className="truncate text-xs" title={job.originalName}>
               {job.originalName}
@@ -123,6 +117,9 @@ export function JobCard({
               className="size-full object-contain opacity-60"
             />
           </div>
+        )}
+        {job.status === "done" && job.dressId && (
+          <DressDetails job={job} onEdit={() => setEditing(true)} />
         )}
         {job.status === "failed" && job.error && (
           <p className="mt-3 text-sm text-destructive" role="alert">
@@ -176,44 +173,51 @@ export function JobCard({
           )}
         </CardFooter>
       )}
+
+      {job.dressId && (
+        <DressDialog job={job} open={editing} onOpenChange={setEditing} onSave={onSaveDress} />
+      )}
     </Card>
   )
 }
 
-function RenameForm({
-  initial,
-  onSave,
-  onCancel,
-}: {
-  initial: string
-  onSave: (name: string) => Promise<void>
-  onCancel: () => void
-}) {
-  const [value, setValue] = useState(initial)
-  const [saving, setSaving] = useState(false)
-
+/** Colors and price under the result, or a prompt to add them. */
+function DressDetails({ job, onEdit }: { job: Job; onEdit: () => void }) {
+  const empty = job.colors.length === 0 && job.price === undefined
+  if (empty) {
+    return (
+      <Button size="sm" variant="ghost" className="mt-2 -ml-2" onClick={onEdit}>
+        <PlusIcon data-icon="inline-start" />
+        Add colors &amp; price
+      </Button>
+    )
+  }
   return (
-    <form
-      onSubmit={async (e) => {
-        e.preventDefault()
-        if (!value.trim() || value.trim() === initial) return onCancel()
-        setSaving(true)
-        await onSave(value)
-        setSaving(false)
-      }}
+    <button
+      type="button"
+      onClick={onEdit}
+      aria-label="Edit colors and price"
+      className="mt-3 flex w-full items-start justify-between gap-3 rounded-md text-left focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
     >
-      <Input
-        autoFocus
-        value={value}
-        maxLength={80}
-        disabled={saving}
-        aria-label="Dress name"
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => e.key === "Escape" && onCancel()}
-        onBlur={(e) => !saving && e.currentTarget.form?.requestSubmit()}
-        className="h-7 text-sm"
-      />
-    </form>
+      <span className="flex min-w-0 flex-wrap gap-1">
+        {job.colors.length ? (
+          job.colors.map((c) => (
+            <Badge key={c} variant="outline">
+              {c}
+            </Badge>
+          ))
+        ) : (
+          <span className="text-sm text-muted-foreground">No colors yet</span>
+        )}
+      </span>
+      <span className="shrink-0 text-sm font-medium tabular-nums">
+        {job.price === undefined ? (
+          <span className="font-normal text-muted-foreground">No price</span>
+        ) : (
+          formatPrice(job.price)
+        )}
+      </span>
+    </button>
   )
 }
 

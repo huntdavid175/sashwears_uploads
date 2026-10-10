@@ -24,6 +24,11 @@ CREATE TABLE IF NOT EXISTS dresses (
 );
 
 -- No foreign key to templates: jobs (and their results) outlive a deleted template.
+-- Added after launch; kept as ALTERs so re-running the migration upgrades existing databases.
+ALTER TABLE dresses ADD COLUMN IF NOT EXISTS colors text[] NOT NULL DEFAULT '{}';
+
+ALTER TABLE dresses ADD COLUMN IF NOT EXISTS price numeric(12, 2);
+
 CREATE TABLE IF NOT EXISTS jobs (
   id uuid PRIMARY KEY,
   template_id uuid NOT NULL,

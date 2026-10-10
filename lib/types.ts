@@ -57,6 +57,10 @@ export type Dress = {
   fileName: string
   /** The latest result on ImageKit, at "<folder>/<fileName>.<ext>". */
   image?: StoredImage
+  /** Colors it's available in, entered by the user. */
+  colors: string[]
+  /** Selling price in CURRENCY (lib/dress.ts), entered by the user. */
+  price?: number
 }
 
 export type Job = {
@@ -77,6 +81,8 @@ export type Job = {
   /** From the dress, for display. */
   name?: string
   fileName?: string
+  colors: string[]
+  price?: number
   /** The dress's current image on ImageKit, set when done. */
   output?: StoredImage
   /** Requested output size, e.g. "1024x1536". */

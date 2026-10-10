@@ -76,6 +76,13 @@ Legend: `[ ]` todo · `[x]` done
 - [ ] **You:** set Vercel env vars: `DATABASE_URL`, `OPENAI_API_KEY`, `IMAGEKIT_PRIVATE_KEY`, `IMAGEKIT_PUBLIC_KEY` (+ optional `OPENAI_NAMING_MODEL`, `IMAGEKIT_FOLDER`); Fluid compute on (default)
 - [ ] **Needs your keys:** real run — upload, names, ImageKit files, regenerate replaces, rename moves the file, a slow `high` edit fits in 300s
 
+## Phase 9 — Dress details
+- [x] `dresses.colors` (text[]) + `dresses.price` (numeric) via idempotent ALTERs; migration applied to the Neon DB
+- [x] `PATCH /api/jobs/[id]` takes `{ name?, colors?, price? }` (`updateDress`); validation in `lib/dress.ts`
+- [x] Card shows colors + price under the result; "Dress details" dialog edits name, colors (chips), price
+- [x] Currency from `NEXT_PUBLIC_CURRENCY` (default USD); tests 38 / lint / tsc / build pass
+- [ ] **You:** set `NEXT_PUBLIC_CURRENCY` in Vercel if not USD, push, check on the live app
+
 ---
 
 ## Assumptions

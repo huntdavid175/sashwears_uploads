@@ -30,10 +30,13 @@ type Row = {
   dress_name: string | null
   dress_file_name: string | null
   dress_image: StoredImage | null
+  dress_colors: string[] | null
+  dress_price: string | number | null
 }
 
 const SELECT = `
-  SELECT j.*, d.name AS dress_name, d.file_name AS dress_file_name, d.image AS dress_image
+  SELECT j.*, d.name AS dress_name, d.file_name AS dress_file_name, d.image AS dress_image,
+    d.colors AS dress_colors, d.price AS dress_price
   FROM jobs j LEFT JOIN dresses d ON d.id = j.dress_id`
 
 function toJob(r: Row): Job {
@@ -46,6 +49,8 @@ function toJob(r: Row): Job {
     dressId: r.dress_id ?? undefined,
     name: r.dress_name ?? undefined,
     fileName: r.dress_file_name ?? undefined,
+    colors: r.dress_colors ?? [],
+    price: r.dress_price == null ? undefined : Number(r.dress_price),
     output: r.status === "done" ? (r.dress_image ?? undefined) : undefined,
     size: r.size ?? undefined,
     status: r.status,
@@ -86,6 +91,7 @@ export function newJob(
     originalName: input.originalName,
     source: input.source,
     dressId: input.dressId,
+    colors: [],
     status: "queued",
     attempts: 0,
     createdAt: new Date().toISOString(),
@@ -191,10 +197,37 @@ export async function requeueJob(id: string): Promise<Job> {
 
 // ---- Dresses -------------------------------------------------------------------------------
 
-type DressRow = { id: string; name: string; file_name: string; image: StoredImage | null }
+type DressRow = {
+  id: string
+  name: string
+  file_name: string
+  image: StoredImage | null
+  colors: string[]
+  price: string | number | null
+}
 
 function toDress(r: DressRow): Dress {
-  return { id: r.id, name: r.name, fileName: r.file_name, image: r.image ?? undefined }
+  return {
+    id: r.id,
+    name: r.name,
+    fileName: r.file_name,
+    image: r.image ?? undefined,
+    colors: r.colors,
+    price: r.price == null ? undefined : Number(r.price),
+  }
+}
+
+/** Colors and price are user-entered; `price: null` clears it. */
+export async function setDressDetails(
+  id: string,
+  details: { colors: string[]; price: number | null },
+): Promise<Dress> {
+  const [row] = await getDb().query<DressRow>(
+    "UPDATE dresses SET colors = $2, price = $3 WHERE id = $1 RETURNING *",
+    [id, details.colors, details.price],
+  )
+  if (!row) throw new StoreError("not_found", "Dress not found")
+  return toDress(row)
 }
 
 export async function getDress(id: string): Promise<Dress> {
