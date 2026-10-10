@@ -56,7 +56,7 @@ Hosted on **Vercel (Hobby)**, no sign-in. The store owner uploads a dress on `/`
 - `lib/size.ts` — output size closest to the source aspect ratio, per model limits.
 - `lib/openai/edit.ts` — the edit call (no retries, 270s timeout to fit the function limit), prompt framing (`composePrompt`), SDK error → readable message.
 - `lib/openai/name.ts` — vision model names each dress from the source photo (never throws; falls back to the file name).
-- `lib/imagekit.ts` — browser upload auth, file lookup/validation, download, upload (exact path; `replace` = overwrite + purge), rename, delete.
+- `lib/imagekit.ts` — browser upload auth, file lookup/validation, download, `uploadImage` (exact path, never overwrites), `putImage` (replace a result), `relocateImage` (move/rename = re-upload + delete), delete.
 - `lib/dress.ts` — dress input rules (sizes, colour names, quantities, price) shared by API and forms; price formatting (currency from `NEXT_PUBLIC_CURRENCY`).
 - `lib/queue.ts` — `runNext` / `runJob`, `regeneratePhoto`, `updateProduct` (renaming the dress or a colour renames its ImageKit files via `syncFileNames`).
 - `lib/shopify.ts` — Shopify product CSV (checked against Shopify's `product_template.csv`; re-check if Shopify changes its columns). `lib/api.ts` — `kickWorker` / `kickWorkerAfter`, error responses.
@@ -75,6 +75,7 @@ Hosted on **Vercel (Hobby)**, no sign-in. The store owner uploads a dress on `/`
 - Server-only modules import `"server-only"`; Vitest aliases it to `test/server-only-stub.ts`.
 - Cache Components is on: pages that read data must do so in client components or behind `<Suspense>`; `GET` handlers that don't read the request call `await connection()`.
 - In Route Handlers, read `request.url` (e.g. the origin for `kickWorker`) **before** any `try` whose `catch` calls `errorResponse` — otherwise the prerender bail-out gets caught and logged during `next build`.
+- **The ImageKit account has no file versions** (`Versions Limit Exceeded. Limit: 0`): overwrite, move and rename all fail. Only ever upload (with `overwriteFile: false`) and delete — use `putImage` / `relocateImage`. `lib/imagekit.test.ts` pins this down.
 - No local disk on Vercel: never write files; everything persistent goes to Postgres or ImageKit.
 - A **dress** is one Shopify product: `products.handle` (unique) is both the Shopify URL handle and the file-name stem. Colour names are unique per dress.
 - Client components that read the path/params (`usePathname`, `useParams`) need a `<Suspense>` boundary with Cache Components (the header is wrapped in the layout; `/dresses/[id]` wraps its page). Don't use random values (`crypto.randomUUID()`) during render — prerendering rejects them; and never put changing keys in element `id`s (hydration mismatch).

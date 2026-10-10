@@ -116,35 +116,31 @@ export async function downloadImage(image: StoredImage): Promise<Buffer> {
   return data
 }
 
-/**
- * Upload at an exact path, never adding a random suffix. `replace` overwrites an existing
- * file there (and purges the CDN so the same URL serves the new image); without it an
- * existing file makes the upload fail instead of being clobbered.
+/*
+ * Our ImageKit plan has no file versions ("Versions Limit Exceeded. Limit: 0"), and ImageKit
+ * treats overwrite, move and rename as version operations — they fail. So files are only ever
+ * uploaded (never over an existing one) and deleted; "replace", "move" and "rename" below are
+ * built from those two.
  */
+
+/** Upload at an exact path, never adding a random suffix and never overwriting. */
 export async function uploadImage(opts: {
   data: Buffer
   folder: string
   fileName: string
-  replace: boolean
 }): Promise<StoredImage> {
-  const ik = getClient()
   const info = readImageInfo(opts.data)
-  if (!info) throw new UploadError("Generated image is not a PNG, JPEG or WebP")
+  if (!info) throw new UploadError("Image is not a PNG, JPEG or WebP")
   try {
-    const res = await ik.files.upload({
+    const res = await getClient().files.upload({
       file: await toFile(opts.data, opts.fileName),
       fileName: opts.fileName,
       folder: opts.folder,
       useUniqueFileName: false,
-      overwriteFile: opts.replace,
+      overwriteFile: false,
     })
     if (!res.fileId || !res.filePath || !res.url) {
       throw new UploadError("ImageKit returned an incomplete upload response")
-    }
-    if (opts.replace) {
-      await ik.cache.invalidation
-        .create({ url: res.url })
-        .catch((err) => console.warn("[imagekit] cache purge failed:", toUploadError(err).message))
     }
     return {
       fileId: res.fileId,
@@ -159,42 +155,60 @@ export async function uploadImage(opts: {
   }
 }
 
-/** Rename in place (purging the old URL). Returns the file's new path and URL. */
-export async function renameImage(file: StoredImage, newFileName: string): Promise<StoredImage> {
+/**
+ * Upload `data` as `<folder>/<fileName>`, replacing `previous` (a photo's earlier result).
+ * Same path: delete first, then upload, then purge the CDN so the URL shows the new image.
+ * Different path: upload first, then delete the old file. Throws `ReplacedError` when the old
+ * file was already deleted but the upload failed, so the caller can forget it.
+ */
+export async function putImage(opts: {
+  data: Buffer
+  folder: string
+  fileName: string
+  previous?: StoredImage
+}): Promise<StoredImage> {
+  const { previous, ...target } = opts
+  const samePath = previous?.filePath === `${opts.folder}/${opts.fileName}`
+  if (samePath) await deleteImage(previous!.fileId)
+  let uploaded: StoredImage
   try {
-    await getClient().files.rename({ filePath: file.filePath, newFileName, purgeCache: true })
+    uploaded = await uploadImage(target)
   } catch (err) {
-    throw toUploadError(err)
+    if (samePath) throw new ReplacedError(toUploadError(err).message)
+    throw err
   }
-  const url = new URL(file.url)
-  url.pathname = url.pathname.replace(/[^/]+$/, encodeURIComponent(newFileName))
-  url.search = ""
-  return {
-    ...file,
-    filePath: file.filePath.replace(/[^/]+$/, newFileName),
-    url: url.toString(),
-    updatedAt: new Date().toISOString(),
+  if (samePath) {
+    await getClient()
+      .cache.invalidation.create({ url: uploaded.url })
+      .catch((err) => console.warn("[imagekit] cache purge failed:", toUploadError(err).message))
+  } else if (previous) {
+    await deleteImage(previous.fileId).catch((err) =>
+      console.warn("[imagekit] couldn't delete replaced file:", toUploadError(err).message),
+    )
   }
+  return uploaded
 }
 
-/** Move into `folder` (same file name). Returns the file's new path and URL. */
-export async function moveImage(file: StoredImage, folder: string): Promise<StoredImage> {
-  const name = file.filePath.slice(file.filePath.lastIndexOf("/") + 1)
-  const filePath = `${folder.replace(/\/+$/, "")}/${name}`
-  if (filePath === file.filePath) return file
-  try {
-    await getClient().files.move({ sourceFilePath: file.filePath, destinationPath: folder })
-  } catch (err) {
-    throw toUploadError(err)
-  }
-  // The URL is "<endpoint><filePath>", so swap the path part.
-  const url = new URL(file.url)
-  const encode = (p: string) => p.split("/").map(encodeURIComponent).join("/")
-  const old = encode(file.filePath)
-  if (url.pathname.endsWith(old))
-    url.pathname = url.pathname.slice(0, -old.length) + encode(filePath)
-  url.search = ""
-  return { ...file, filePath, url: url.toString(), updatedAt: new Date().toISOString() }
+/** The upload after deleting a photo's old file failed: the photo now has no result. */
+export class ReplacedError extends UploadError {
+  name = "ReplacedError"
+}
+
+/**
+ * "Move + rename": copy the original bytes to `<folder>/<fileName>`, then delete the old file.
+ * Returns the file as it is now (unchanged if it's already there).
+ */
+export async function relocateImage(
+  file: StoredImage,
+  folder: string,
+  fileName: string,
+): Promise<StoredImage> {
+  if (file.filePath === `${folder}/${fileName}`) return file
+  const moved = await uploadImage({ data: await downloadImage(file), folder, fileName })
+  await deleteImage(file.fileId).catch((err) =>
+    console.warn("[imagekit] couldn't delete moved file:", toUploadError(err).message),
+  )
+  return moved
 }
 
 export async function deleteImage(fileId: string) {

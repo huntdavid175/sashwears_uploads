@@ -53,19 +53,25 @@ vi.mock("@/lib/imagekit", async (importOriginal) => {
   return {
     ...real,
     downloadImage: async () => pngHeader(800, 1200),
-    uploadImage: async (opts: { folder: string; fileName: string; replace: boolean }) => {
-      ik.uploads.push({ folder: opts.folder, fileName: opts.fileName, replace: opts.replace })
-      return file(`${opts.folder}/${opts.fileName}`)
+    // `replace`: a same-path re-upload (the real one deletes the old file first).
+    putImage: async (opts: {
+      folder: string
+      fileName: string
+      previous?: { filePath: string; fileId: string }
+    }) => {
+      const path = `${opts.folder}/${opts.fileName}`
+      const replace = opts.previous?.filePath === path
+      ik.uploads.push({ folder: opts.folder, fileName: opts.fileName, replace })
+      if (opts.previous && !replace) ik.deletes.push(opts.previous.fileId)
+      return file(path)
     },
-    renameImage: async (f: { filePath: string }, newFileName: string) => {
-      ik.renames.push({ filePath: f.filePath, newFileName })
-      return file(f.filePath.replace(/[^/]+$/, newFileName))
-    },
-    moveImage: async (f: { filePath: string }, folder: string) => {
-      const filePath = `${folder}/${f.filePath.slice(f.filePath.lastIndexOf("/") + 1)}`
-      if (filePath === f.filePath) return f
-      ik.moves.push({ filePath: f.filePath, folder })
-      return file(filePath)
+    // Re-upload under a new name (and maybe folder), recorded as a rename (+ move).
+    relocateImage: async (f: { filePath: string }, folder: string, fileName: string) => {
+      const target = `${folder}/${fileName}`
+      if (f.filePath === target) return f
+      ik.renames.push({ filePath: f.filePath, newFileName: fileName })
+      if (!f.filePath.startsWith(`${folder}/`)) ik.moves.push({ filePath: f.filePath, folder })
+      return file(target)
     },
     deleteImage: async (fileId: string) => {
       ik.deletes.push(fileId)

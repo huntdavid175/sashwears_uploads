@@ -1,13 +1,12 @@
 import "server-only"
 
 import {
-  deleteImage,
   downloadImage,
   imagekitFolder,
-  moveImage,
-  renameImage,
+  putImage,
+  ReplacedError,
+  relocateImage,
   toUploadError,
-  uploadImage,
 } from "@/lib/imagekit"
 import { editImage, toEditError } from "@/lib/openai/edit"
 import { cleanName, nameProduct } from "@/lib/openai/name"
@@ -22,6 +21,7 @@ import {
   newJob,
 } from "@/lib/store/jobs"
 import {
+  clearPhotoOutput,
   createCompletedProduct,
   freeHandle,
   getPhotoContext,
@@ -92,18 +92,13 @@ async function runJob(job: Job) {
     const ext = snap.outputFormat === "jpeg" ? "jpg" : snap.outputFormat
     const fileName = photoFileName(fresh.product, fresh.color, fresh.photo, ext)
     const folder = dressFolder(fresh.product.handle!)
-    const previous = fresh.photo.output
-    const uploaded = await uploadImage({
-      data: image,
-      folder,
-      fileName,
-      replace: previous?.filePath === `${folder}/${fileName}`,
-    })
-    // A different output format (or name) means a different file: drop the old one.
-    if (previous && previous.fileId !== uploaded.fileId) {
-      await deleteImage(previous.fileId).catch((err) =>
-        console.warn("[queue] couldn't delete replaced file:", toUploadError(err).message),
-      )
+    let uploaded
+    try {
+      uploaded = await putImage({ data: image, folder, fileName, previous: fresh.photo.output })
+    } catch (err) {
+      // The old result was deleted before the upload failed: don't keep pointing at it.
+      if (err instanceof ReplacedError) await clearPhotoOutput(job.photoId)
+      throw err
     }
     await setPhotoOutput(job.photoId, uploaded)
     await finishJob(job.id, { status: "done", size })
@@ -188,8 +183,7 @@ async function syncFileNames(product: Product) {
       const wanted = photoFileName(product, color, photo, ext)
       if (output.filePath === `${folder}/${wanted}`) continue
       try {
-        let file = await moveImage(output, folder)
-        if (!file.filePath.endsWith(`/${wanted}`)) file = await renameImage(file, wanted)
+        const file = await relocateImage(output, folder, wanted)
         await setPhotoOutput(photo.id, file, product.kind === "completed")
       } catch (err) {
         throw new StoreError(
@@ -228,8 +222,7 @@ export async function createCompletedDress(input: CompletedDressInput): Promise<
           const ext = photo.image.filePath.slice(photo.image.filePath.lastIndexOf(".") + 1)
           const name = photoFileName({ handle }, color, photo, ext.toLowerCase())
           try {
-            const moved = await moveImage(photo.image, folder)
-            return { view: photo.view, image: await renameImage(moved, name) }
+            return { view: photo.view, image: await relocateImage(photo.image, folder, name) }
           } catch (err) {
             throw new StoreError(
               "invalid",

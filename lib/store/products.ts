@@ -397,6 +397,11 @@ export async function setPhotoOutput(
   )
 }
 
+/** The photo's result file is gone (deleted before a failed re-upload). */
+export async function clearPhotoOutput(photoId: string): Promise<void> {
+  await getDb().query("UPDATE product_photos SET output = NULL WHERE id = $1", [photoId])
+}
+
 export async function markExported(ids: string[]): Promise<void> {
   await getDb().query("UPDATE products SET exported_at = now() WHERE id = ANY($1::uuid[])", [
     ids.filter(isUuid),
