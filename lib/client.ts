@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 
-import type { Job, StoredImage, Template } from "@/lib/types"
+import type { Job, StoredImage, Template, Upload } from "@/lib/types"
 
 /** fetch + JSON, throwing the server's `{ error }` message on failure. */
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
@@ -36,7 +36,7 @@ type UploadAuth = {
 }
 
 /** Upload one file straight from the browser to ImageKit. Returns its fileId. */
-export async function uploadToImageKit(file: File, kind: "sources" | "references") {
+export async function uploadToImageKit(file: File, kind: "sources" | "references" | "inbox") {
   if (file.size > MAX_UPLOAD_BYTES) throw new Error(`${file.name} is larger than 50MB`)
   const auth = await api<UploadAuth>(`/api/imagekit/auth?kind=${kind}`)
   const form = new FormData()
@@ -120,6 +120,43 @@ export function useJobs(templateId: string) {
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
 
   return { jobs, refresh }
+}
+
+/** The store owner's inbox. Reloads when the tab regains focus, so new photos show up. */
+export function useUploads() {
+  const [uploads, setUploads] = useState<Upload[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [version, setVersion] = useState(0)
+
+  useEffect(() => {
+    let alive = true
+    api<Upload[]>("/api/uploads").then(
+      (list) => {
+        if (!alive) return
+        setUploads(list)
+        setError(null)
+      },
+      (err: Error) => alive && setError(err.message),
+    )
+    return () => {
+      alive = false
+    }
+  }, [version])
+
+  useEffect(() => {
+    const onFocus = () => setVersion((v) => v + 1)
+    window.addEventListener("focus", onFocus)
+    return () => window.removeEventListener("focus", onFocus)
+  }, [])
+
+  const refresh = useCallback(() => setVersion((v) => v + 1), [])
+
+  /** Apply a change locally before (or instead of) reloading. */
+  const update = useCallback((fn: (list: Upload[]) => Upload[]) => {
+    setUploads((list) => (list ? fn(list) : list))
+  }, [])
+
+  return { uploads, error, refresh, update }
 }
 
 /** Read width/height in the browser so we can show size and cost before uploading. */

@@ -48,3 +48,17 @@ CREATE TABLE IF NOT EXISTS jobs (
 CREATE INDEX IF NOT EXISTS jobs_template_created_idx ON jobs (template_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS jobs_status_idx ON jobs (status);
+
+-- Store owner's inbox: raw photos uploaded for download, grouped by batch.
+CREATE TABLE IF NOT EXISTS uploads (
+  id uuid PRIMARY KEY,
+  batch_id uuid NOT NULL,
+  note text,
+  original_name text NOT NULL,
+  image jsonb NOT NULL,
+  size_bytes bigint,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  downloaded_at timestamptz
+);
+
+CREATE INDEX IF NOT EXISTS uploads_created_idx ON uploads (created_at DESC);

@@ -94,3 +94,17 @@ export type Job = {
   startedAt?: string
   finishedAt?: string
 }
+
+/** A photo the store owner uploaded for download (no editing). */
+export type Upload = {
+  id: string
+  /** Photos uploaded together share a batch and its note. */
+  batchId: string
+  note?: string
+  originalName: string
+  image: StoredImage
+  sizeBytes?: number
+  createdAt: string
+  /** First time it was downloaded from the app. */
+  downloadedAt?: string
+}

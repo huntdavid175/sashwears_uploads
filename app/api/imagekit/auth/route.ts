@@ -1,11 +1,13 @@
 import { errorResponse } from "@/lib/api"
-import { uploadAuth } from "@/lib/imagekit"
+import { uploadAuth, type UploadKind } from "@/lib/imagekit"
 
-/** One-time signature for a direct browser → ImageKit upload. `?kind=sources|references` */
+const KINDS: UploadKind[] = ["sources", "references", "inbox"]
+
+/** One-time signature for a direct browser → ImageKit upload. `?kind=sources|references|inbox` */
 export async function GET(request: Request) {
-  const kind = new URL(request.url).searchParams.get("kind")
+  const kind = new URL(request.url).searchParams.get("kind") as UploadKind
   try {
-    const auth = uploadAuth(kind === "references" ? "references" : "sources")
+    const auth = uploadAuth(KINDS.includes(kind) ? kind : "sources")
     return Response.json(auth, { headers: { "Cache-Control": "no-store" } })
   } catch (err) {
     return errorResponse(err)

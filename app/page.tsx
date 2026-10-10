@@ -1,12 +1,5 @@
-import { Suspense } from "react"
+import { Inbox } from "@/components/uploads/inbox"
 
-import { Studio } from "@/components/studio/studio"
-
-export default function Home() {
-  return (
-    // Studio reads the selected template from the URL, which needs a Suspense boundary.
-    <Suspense>
-      <Studio />
-    </Suspense>
-  )
+export default function UploadsPage() {
+  return <Inbox />
 }

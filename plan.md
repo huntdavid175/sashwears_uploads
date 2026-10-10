@@ -83,6 +83,14 @@ Legend: `[ ]` todo · `[x]` done
 - [x] Currency from `NEXT_PUBLIC_CURRENCY` (default USD); tests 38 / lint / tsc / build pass
 - [ ] **You:** set `NEXT_PUBLIC_CURRENCY` in Vercel if not USD, push, check on the live app
 
+## Phase 10 — Uploads inbox, dark mode, layout
+- [x] Top bar with **Uploads** (`/`) and **Studio** (`/studio`) + theme menu (Light / Dark / System)
+- [x] Uploads: store owner drops photos (any image type incl. HEIC, 100/batch, optional note) → browser → ImageKit `_inbox`; `uploads` table; migration applied
+- [x] Received list grouped by batch: New badges, Download / Download all / Download new (marks downloaded), Delete (also removes the ImageKit file)
+- [x] Dark theme tokens in `globals.css` (`.dark`), no-flash head script (`lib/theme-script.ts`), `useTheme` (`lib/theme.ts`)
+- [x] Content capped at `max-w-6xl` on Uploads and Studio; checked in headless Edge (light/dark, 1600px and 500px)
+- [ ] **You:** push, then try an upload + download on the live app (and from a phone)
+
 ---
 
 ## Assumptions

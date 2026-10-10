@@ -42,9 +42,7 @@ export function Studio() {
 
   return (
     <div className="flex flex-1 flex-col md:flex-row">
-      <aside className="flex shrink-0 flex-col gap-4 border-b border-border p-4 md:sticky md:top-0 md:h-dvh md:w-64 md:border-r md:border-b-0">
-        <p className="font-condensed text-xl font-semibold tracking-tight">Backdrop Studio</p>
-
+      <aside className="flex shrink-0 flex-col gap-4 border-b border-border p-4 md:sticky md:top-14 md:h-[calc(100dvh-3.5rem)] md:w-64 md:border-r md:border-b-0">
         <Button onClick={() => setCreating(true)}>
           <PlusIcon data-icon="inline-start" />
           New template
@@ -83,7 +81,7 @@ export function Studio() {
         </nav>
       </aside>
 
-      <main className="min-w-0 flex-1 p-4 md:p-8">
+      <main className="mx-auto w-full max-w-6xl min-w-0 flex-1 p-4 md:p-8">
         {error ? (
           <Alert variant="destructive">
             <AlertTitle>Couldn&apos;t load templates</AlertTitle>

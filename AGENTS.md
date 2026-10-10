@@ -31,7 +31,7 @@ Before the final response, run one reporting pass. If candidates remain, from th
 
 ## Project: Backdrop Studio
 
-Hosted on **Vercel (Hobby)**, no sign-in. A **template** = one background reference photo + instructions + model settings. Every product photo run through a template keeps its subject exactly and gets the template's background, via the OpenAI Images Edit API (`[source, reference]` as inputs). A vision model names each dress; the result is stored on **ImageKit** under that name. Data lives in **Neon Postgres**. Spec and progress live in `plan.md` — tick its checkboxes as work completes.
+Hosted on **Vercel (Hobby)**, no sign-in. Two sections: **Uploads** (`/`) — the store owner drops raw photos that get downloaded for later work — and **Studio** (`/studio`). A **template** = one background reference photo + instructions + model settings. Every product photo run through a template keeps its subject exactly and gets the template's background, via the OpenAI Images Edit API (`[source, reference]` as inputs). A vision model names each dress; the result is stored on **ImageKit** under that name. Data lives in **Neon Postgres**. Spec and progress live in `plan.md` — tick its checkboxes as work completes.
 
 ### Commands
 
@@ -57,13 +57,16 @@ Hosted on **Vercel (Hobby)**, no sign-in. A **template** = one background refere
 - `lib/imagekit.ts` — browser upload auth, file lookup/validation, download, upload (exact path; `replace` = overwrite + purge), rename, delete.
 - `lib/dress.ts` — dress colors/price parsing + price formatting (client and server; currency from `NEXT_PUBLIC_CURRENCY`).
 - `lib/queue.ts` — `runNext` / `runJob`, regenerate, retry, `updateDress` (name/colors/price) and rename. `lib/api.ts` — `kickWorker` / `kickWorkerAfter`, error responses.
+- `components/app-header.tsx` — top bar: section nav + theme menu. `lib/theme.ts` / `lib/theme-script.ts` — light/dark/system (class `dark` on `<html>`, set before paint by an inline head script).
+- `components/uploads/inbox.tsx` + `lib/store/uploads.ts` + `app/api/uploads/**` — the store owner's inbox (ImageKit `_inbox` folder, `uploads` table, batches with notes, downloaded tracking).
 - `components/studio/` — the UI; `components/ui/` — shadcn (generated, don't hand-edit unless needed).
 - `lib/client.ts` — client fetch helper, `imageUrl` (ImageKit resize / download / cache-bust), `uploadToImageKit`, data hooks (`useTemplates`, `useJobs` with polling only while jobs are active).
 
 ### Conventions and gotchas
 
 - **shadcn uses Base UI, not Radix**: `render={<Button />}` instead of `asChild`; Select needs an `items` prop; ToggleGroup values are arrays; toasts are `toast.add({ title, type })` from `@/components/ui/toast`. Load the `shadcn` skill before UI work. `cn` comes from the `cn` npm package via `@/lib/utils`.
-- Design direction is "grey-card studio": neutral grey canvas, white panels, one cobalt accent (`--primary`), Archivo with `font-condensed` reserved for template names. Use semantic tokens from `app/globals.css`, not raw colors.
+- Design direction is "grey-card studio": neutral grey canvas, white panels, one cobalt accent (`--primary`), Archivo with `font-condensed` reserved for template names. Dark mode keeps the idea (deep neutral grey, lifted panels, lighter cobalt). Use semantic tokens from `app/globals.css`, never raw colors or `dark:` overrides. Page content is capped at `max-w-6xl`.
+- Headless Edge on Windows won't lay out narrower than ~500px; check mobile at 500 wide.
 - Code style: no semicolons, double quotes, 100-column lines (`npx prettier --no-semi --print-width 100`).
 - React 19 lint rules are strict: no synchronous `setState` in effects, no ref access during render. Load data inside effects via promise callbacks; remount forms with `key`/conditional rendering instead of reset effects.
 - Server-only modules import `"server-only"`; Vitest aliases it to `test/server-only-stub.ts`.

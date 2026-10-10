@@ -32,13 +32,18 @@ export function imagekitFolder(templateSlug: string) {
   return `/${root()}/${templateSlug}`
 }
 
-/** Where the browser uploads originals ("sources") and template backgrounds ("references"). */
-export function uploadFolder(kind: "sources" | "references") {
+/**
+ * Where the browser uploads: originals to edit ("sources"), template backgrounds
+ * ("references"), and the store owner's photos for download ("inbox").
+ */
+export type UploadKind = "sources" | "references" | "inbox"
+
+export function uploadFolder(kind: UploadKind) {
   return `/${root()}/_${kind}`
 }
 
 /** One-time signature letting the browser upload one file straight to ImageKit. */
-export function uploadAuth(kind: "sources" | "references") {
+export function uploadAuth(kind: UploadKind) {
   const publicKey = process.env.IMAGEKIT_PUBLIC_KEY
   if (!publicKey) throw new UploadError("IMAGEKIT_PUBLIC_KEY is not set.")
   return {
@@ -50,8 +55,14 @@ export function uploadAuth(kind: "sources" | "references") {
 
 const ACCEPTED_MIME = ["image/png", "image/jpeg", "image/webp"]
 
-/** Look up a file the browser uploaded and check it's an image we can edit. */
-export async function getStoredImage(fileId: string): Promise<StoredImage> {
+/**
+ * Look up a file the browser uploaded and check it's an image we can edit. With `anyImage`,
+ * any image type passes (e.g. iPhone HEIC in the inbox) and dimensions may be unknown (0).
+ */
+export async function getUploadedFile(
+  fileId: string,
+  opts: { anyImage?: boolean } = {},
+): Promise<StoredImage & { size?: number; name?: string }> {
   let file
   try {
     file = await getClient().files.get(fileId)
@@ -61,20 +72,37 @@ export async function getStoredImage(fileId: string): Promise<StoredImage> {
     }
     throw toUploadError(err)
   }
-  if (!file.mime || !ACCEPTED_MIME.includes(file.mime)) {
-    throw new StoreError("invalid", `${file.name ?? "File"} is not a PNG, JPEG or WebP image`)
+  const accepted = opts.anyImage
+    ? file.mime?.startsWith("image/")
+    : file.mime && ACCEPTED_MIME.includes(file.mime)
+  if (!accepted) {
+    throw new StoreError(
+      "invalid",
+      `${file.name ?? "File"} is not ${opts.anyImage ? "an image" : "a PNG, JPEG or WebP image"}`,
+    )
   }
-  if (!file.fileId || !file.filePath || !file.url || !file.width || !file.height) {
+  if (!file.fileId || !file.filePath || !file.url) {
     throw new UploadError("ImageKit returned incomplete file details")
+  }
+  if (!opts.anyImage && (!file.width || !file.height)) {
+    throw new UploadError("ImageKit returned no image dimensions")
   }
   return {
     fileId: file.fileId,
     filePath: file.filePath,
     url: file.url,
-    width: file.width,
-    height: file.height,
+    width: file.width ?? 0,
+    height: file.height ?? 0,
     updatedAt: new Date().toISOString(),
+    size: file.size,
+    name: file.name,
   }
+}
+
+/** getUploadedFile, keeping only what gets stored with templates and jobs. */
+export async function getStoredImage(fileId: string): Promise<StoredImage> {
+  const { fileId: id, filePath, url, width, height, updatedAt } = await getUploadedFile(fileId)
+  return { fileId: id, filePath, url, width, height, updatedAt }
 }
 
 /** Original bytes (no ImageKit optimisation) for sending to OpenAI. */
