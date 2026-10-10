@@ -208,6 +208,7 @@ export function DressDetail() {
           key={color.id}
           color={color}
           sizes={product.sizes}
+          finished={product.kind === "completed"}
           onRegenerate={regenerate}
         />
       ))}
@@ -243,10 +244,13 @@ export function DressDetail() {
 function ColorSection({
   color,
   sizes,
+  finished,
   onRegenerate,
 }: {
   color: ProductColor
   sizes: string[]
+  /** Uploaded already edited: no original to compare, nothing to regenerate. */
+  finished: boolean
   onRegenerate: (photo: ProductPhoto) => void
 }) {
   return (
@@ -261,7 +265,12 @@ function ColorSection({
       <CardContent>
         <div className="grid gap-4 sm:grid-cols-2 lg:max-w-3xl">
           {color.photos.map((photo) => (
-            <PhotoTile key={photo.id} photo={photo} onRegenerate={onRegenerate} />
+            <PhotoTile
+              key={photo.id}
+              photo={photo}
+              finished={finished}
+              onRegenerate={onRegenerate}
+            />
           ))}
         </div>
       </CardContent>
@@ -271,9 +280,11 @@ function ColorSection({
 
 function PhotoTile({
   photo,
+  finished,
   onRegenerate,
 }: {
   photo: ProductPhoto
+  finished: boolean
   onRegenerate: (photo: ProductPhoto) => void
 }) {
   const shown = photo.output ?? photo.source
@@ -297,7 +308,16 @@ function PhotoTile({
         ) : null}
       </figcaption>
 
-      {photo.output && !running ? (
+      {photo.output && finished ? (
+        <div className="overflow-hidden rounded-md bg-muted" style={{ aspectRatio: aspect }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- ImageKit resizes it */}
+          <img
+            src={imageUrl(photo.output, { width: PREVIEW_WIDTH })}
+            alt={photo.view}
+            className="size-full object-contain"
+          />
+        </div>
+      ) : photo.output && !running ? (
         <Compare
           before={imageUrl(photo.source, { width: PREVIEW_WIDTH })}
           after={imageUrl(photo.output, { width: PREVIEW_WIDTH })}
@@ -333,14 +353,16 @@ function PhotoTile({
               Download
             </Button>
           )}
-          <Button size="sm" variant="ghost" onClick={() => onRegenerate(photo)}>
-            {photo.status === "failed" ? (
-              <RotateCcwIcon data-icon="inline-start" />
-            ) : (
-              <RefreshCwIcon data-icon="inline-start" />
-            )}
-            {photo.status === "failed" ? "Retry" : "Regenerate"}
-          </Button>
+          {!finished && (
+            <Button size="sm" variant="ghost" onClick={() => onRegenerate(photo)}>
+              {photo.status === "failed" ? (
+                <RotateCcwIcon data-icon="inline-start" />
+              ) : (
+                <RefreshCwIcon data-icon="inline-start" />
+              )}
+              {photo.status === "failed" ? "Retry" : "Regenerate"}
+            </Button>
+          )}
         </div>
       )}
     </figure>

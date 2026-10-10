@@ -66,9 +66,12 @@ export async function DELETE(_req: Request, ctx: RouteContext<"/api/products/[id
   try {
     const { id } = await ctx.params
     const photos = await deleteProduct(id)
-    const files = photos.flatMap((p) => [p.source.fileId, ...(p.output ? [p.output.fileId] : [])])
+    // Completed dresses use one file as both source and result: delete it once.
+    const files = new Set(
+      photos.flatMap((p) => [p.source.fileId, ...(p.output ? [p.output.fileId] : [])]),
+    )
     await Promise.all(
-      files.map((fileId) =>
+      [...files].map((fileId) =>
         deleteImage(fileId).catch((err) =>
           console.warn("[products] couldn't delete ImageKit file:", toUploadError(err).message),
         ),

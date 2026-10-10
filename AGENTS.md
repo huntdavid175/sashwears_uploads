@@ -31,7 +31,7 @@ Before the final response, run one reporting pass. If candidates remain, from th
 
 ## Project: Backdrop Studio
 
-Hosted on **Vercel (Hobby)**, no sign-in. The store owner submits a **dress** on `/` (one price, the sizes it comes in, colours with stock per size; the first colour has a front + back photo, the others a front). Every photo is edited on submit through the **default template** (background reference + instructions + model settings) via the OpenAI Images Edit API (`[source, reference]` as inputs). A vision model names the dress (no colour in the name). Results go to **ImageKit** as `<dress>-<colour>-<front|back>.<ext>`; data in **Neon Postgres**. `/dresses` lists them, `/dresses/[id]` shows every photo, and dresses export as a **Shopify product CSV** (Color × Size variants). `/settings` manages templates. Spec and progress live in `plan.md` — tick its checkboxes as work completes.
+Hosted on **Vercel (Hobby)**, no sign-in. The store owner uploads a dress on `/`, choosing **Completed dress** (photos already edited: she drops them all + price, the AI sorts them by colour and front/back, she reviews and saves — nothing is edited) or **Needs editing** (one price, the sizes it comes in, colours with stock per size; the first colour has a front + back photo, the others a front). Every photo is edited on submit through the **default template** (background reference + instructions + model settings) via the OpenAI Images Edit API (`[source, reference]` as inputs). A vision model names the dress (no colour in the name). Every dress has its own ImageKit folder, `/<root>/dresses/<handle>/`, with files named `<dress>-<colour>-<front|back>.<ext>`; data in **Neon Postgres**. `/dresses` lists them, `/dresses/[id]` shows every photo, and dresses export as a **Shopify product CSV** (Color × Size variants). `/settings` manages templates. Spec and progress live in `plan.md` — tick its checkboxes as work completes.
 
 ### Commands
 
@@ -45,7 +45,8 @@ Hosted on **Vercel (Hobby)**, no sign-in. The store owner submits a **dress** on
 1. Browser uploads the photos / template references **straight to ImageKit** (`uploadToImageKit` in `lib/client.ts`, signed by `GET /api/imagekit/auth`) — Vercel caps request bodies at ~4.5MB, so files never pass through our functions.
 2. `POST /api/products` validates the dress (`lib/dress.ts` rules), verifies each file via the ImageKit API, and inserts product + colours + photos + one queued job per photo in **one SQL statement** (`createProduct`), then kicks the worker.
 3. `POST /api/worker` (`maxDuration = 300`) responds 202 and, in `after()`, claims one job (`claimNextJob`: advisory lock + max 2 processing), downloads source + reference (`?tr=orig-true`), runs the edit (with a back-view hint for backs) and — if the dress is still unnamed — naming from the first colour's front, uploads to ImageKit, then kicks itself for the next job. `GET /api/products[/id]` (polled every 3s while a dress is generating) fails timed-out jobs and re-kicks if anything is queued.
-4. A photo's status is its **latest** job's status; a dress is generating / attention (a failed photo) / ready. Regenerate = a new job for that photo (replaces its file).
+4. Completed dresses: `POST /api/products/classify` (one vision call, `lib/openai/classify.ts`, structured output; a suggestion only) → owner reviews → `POST /api/products` with `kind: "completed"` → `createCompletedDress` moves + renames the files into the dress folder and saves them as both source and result (no jobs, no regenerate).
+5. A photo's status is its **latest** job's status (or done, if it has a result and no job); a dress is generating / attention (a failed photo) / ready. Regenerate = a new job for that photo (replaces its file).
 
 ### Layout
 
@@ -60,7 +61,7 @@ Hosted on **Vercel (Hobby)**, no sign-in. The store owner submits a **dress** on
 - `lib/queue.ts` — `runNext` / `runJob`, `regeneratePhoto`, `updateProduct` (renaming the dress or a colour renames its ImageKit files via `syncFileNames`).
 - `lib/shopify.ts` — Shopify product CSV (checked against Shopify's `product_template.csv`; re-check if Shopify changes its columns). `lib/api.ts` — `kickWorker` / `kickWorkerAfter`, error responses.
 - `components/app-header.tsx` — top bar: section nav + theme menu. `lib/theme.ts` / `lib/theme-script.ts` — light/dark/system (class `dark` on `<html>`, set before paint by an inline head script).
-- `components/dresses/` — new-dress form (`/`), dress list + export dialog, dress detail, edit dialog, shared fields (photo slot, size picker, quantity grid). `components/settings/` — templates. `components/compare.tsx` — before/after slider.
+- `components/dresses/` — upload page (`/`: type chooser, `completed-dress-form`, `generated-dress-form`, shared `dress-basics`), dress list + export dialog, dress detail, edit dialog, shared fields (photo slot, size picker, quantity grid). `components/settings/` — templates. `components/compare.tsx` — before/after slider.
 - `components/ui/` — shadcn `components/ui/` — shadcn (generated, don't hand-edit unless needed).
 - `lib/client.ts` — client fetch helper, `imageUrl` (ImageKit resize / download / cache-bust), `uploadToImageKit`, `exportToShopify`, data hooks (`useProducts`, `useProduct`, `useTemplates`; poll only while something is generating, reload on tab focus).
 

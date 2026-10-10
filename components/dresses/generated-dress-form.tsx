@@ -17,14 +17,13 @@ import {
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
-import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/toast"
 import { api, uploadToImageKit } from "@/lib/client"
-import { CURRENCY, DEFAULT_SIZES, MAX_COLORS, parsePrice } from "@/lib/dress"
+import { MAX_COLORS, parsePrice } from "@/lib/dress"
 import type { Product } from "@/lib/types"
 
-import { PhotoSlot, QuantityGrid, SizePicker } from "./fields"
-import { RecentDresses } from "./recent-dresses"
+import { DressBasicsCard, useDressBasics } from "./dress-basics"
+import { PhotoSlot, QuantityGrid } from "./fields"
 
 type ColorDraft = {
   key: string
@@ -48,41 +47,11 @@ const newColor = (): ColorDraft => ({
 /** Photos uploaded to ImageKit at once. */
 const PARALLEL = 3
 
-export function NewDressPage() {
-  // Remounting the form (new key) after a submit clears it without reset effects.
-  const [formKey, setFormKey] = useState(0)
-  const [lastSubmitted, setLastSubmitted] = useState<Product | null>(null)
-
-  return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 p-4 md:p-8">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">New dress</h1>
-        <p className="text-muted-foreground">
-          Add the price, sizes and every colour. The first colour needs a front and a back photo;
-          other colours just a front.
-        </p>
-      </header>
-
-      <NewDressForm
-        key={formKey}
-        onSubmitted={(product) => {
-          setLastSubmitted(product)
-          setFormKey((k) => k + 1)
-          window.scrollTo({ top: 0, behavior: "smooth" })
-        }}
-      />
-
-      <RecentDresses highlight={lastSubmitted?.id} />
-    </main>
-  )
-}
-
-function NewDressForm({ onSubmitted }: { onSubmitted: (product: Product) => void }) {
+/** "Needs editing": photos go through the shop background template on submit. */
+export function GeneratedDressForm({ onSubmitted }: { onSubmitted: (product: Product) => void }) {
   const id = useId()
-  const [price, setPrice] = useState("")
-  const [sizeOptions, setSizeOptions] = useState(DEFAULT_SIZES)
-  const [sizes, setSizes] = useState(DEFAULT_SIZES)
-  const [note, setNote] = useState("")
+  const basics = useDressBasics()
+  const { price, sizes, note } = basics
   const [colors, setColors] = useState<ColorDraft[]>([newColor()])
   const [error, setError] = useState<string | null>(null)
   const [attempted, setAttempted] = useState(false)
@@ -172,51 +141,7 @@ function NewDressForm({ onSubmitted }: { onSubmitted: (product: Product) => void
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-6" noValidate>
-      <Card>
-        <CardHeader>
-          <CardTitle>Dress</CardTitle>
-          <CardDescription>One price for every colour and size.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <FieldGroup>
-            <Field data-invalid={attempted && !price.trim() ? true : undefined}>
-              <FieldLabel htmlFor={`${id}-price`}>Price ({CURRENCY})</FieldLabel>
-              <Input
-                id={`${id}-price`}
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                inputMode="decimal"
-                placeholder="0.00"
-                disabled={busy}
-                aria-invalid={attempted && !price.trim() ? true : undefined}
-                className="max-w-48"
-              />
-            </Field>
-            <Field>
-              <FieldLabel>Sizes it comes in</FieldLabel>
-              <SizePicker
-                options={sizeOptions}
-                value={sizes}
-                onChange={setSizes}
-                onAddOption={(size) => setSizeOptions((o) => [...o, size])}
-                disabled={busy}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor={`${id}-note`}>Note (optional)</FieldLabel>
-              <Textarea
-                id={`${id}-note`}
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                rows={2}
-                maxLength={500}
-                disabled={busy}
-                placeholder="Anything I should know about this dress"
-              />
-            </Field>
-          </FieldGroup>
-        </CardContent>
-      </Card>
+      <DressBasicsCard basics={basics} busy={busy} attempted={attempted} />
 
       {colors.map((c, i) => (
         <Card key={c.key}>

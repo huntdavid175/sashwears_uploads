@@ -4,6 +4,7 @@ import {
   deleteImage,
   downloadImage,
   imagekitFolder,
+  moveImage,
   renameImage,
   toUploadError,
   uploadImage,
@@ -21,6 +22,8 @@ import {
   newJob,
 } from "@/lib/store/jobs"
 import {
+  createCompletedProduct,
+  freeHandle,
   getPhotoContext,
   getProduct,
   nameProductOnce,
@@ -29,7 +32,7 @@ import {
   setPhotoOutput,
 } from "@/lib/store/products"
 import { getDefaultTemplate, getTemplate, slugify } from "@/lib/store/templates"
-import type { Job, Product, ProductColor, ProductPhoto } from "@/lib/types"
+import type { Job, PhotoView, Product, ProductColor, ProductPhoto, StoredImage } from "@/lib/types"
 
 /**
  * How jobs run on Vercel: there is no long-lived process, so each job runs in its own
@@ -40,8 +43,10 @@ import type { Job, Product, ProductColor, ProductPhoto } from "@/lib/types"
  */
 export const CONCURRENCY = 2
 
-/** All dress results live in one folder; file names carry the dress, colour and view. */
-const PRODUCTS_FOLDER = "products"
+/** Each dress has its own folder on ImageKit, named after it. */
+export function dressFolder(handle: string) {
+  return imagekitFolder(`dresses/${handle}`)
+}
 
 export { hasQueuedJobs }
 
@@ -86,7 +91,7 @@ async function runJob(job: Job) {
     const fresh = await getPhotoContext(job.photoId)
     const ext = snap.outputFormat === "jpeg" ? "jpg" : snap.outputFormat
     const fileName = photoFileName(fresh.product, fresh.color, fresh.photo, ext)
-    const folder = imagekitFolder(PRODUCTS_FOLDER)
+    const folder = dressFolder(fresh.product.handle!)
     const previous = fresh.photo.output
     const uploaded = await uploadImage({
       data: image,
@@ -123,6 +128,9 @@ export async function regeneratePhoto(productId: string, photoId: string): Promi
   const product = await getProduct(productId)
   const photo = product.colors.flatMap((c) => c.photos).find((p) => p.id === photoId)
   if (!photo) throw new StoreError("not_found", "Photo not found")
+  if (product.kind === "completed") {
+    throw new StoreError("invalid", "This dress was uploaded already edited")
+  }
   if (photo.status === "queued" || photo.status === "processing") {
     throw new StoreError("invalid", "This photo is already being generated")
   }
@@ -165,18 +173,24 @@ export async function updateProduct(id: string, patch: ProductPatch): Promise<Pr
   return getProduct(id)
 }
 
-/** Rename any finished photo whose ImageKit file name no longer matches its dress/colour. */
+/**
+ * Move/rename any finished photo whose ImageKit path no longer matches
+ * "<dress folder>/<dress>-<colour>-<view>.<ext>".
+ */
 async function syncFileNames(product: Product) {
   if (!product.handle) return
+  const folder = dressFolder(product.handle)
   for (const color of product.colors) {
     for (const photo of color.photos) {
       const output = photo.output
       if (!output || photo.status === "processing") continue
       const ext = output.filePath.slice(output.filePath.lastIndexOf(".") + 1)
       const wanted = photoFileName(product, color, photo, ext)
-      if (output.filePath.endsWith(`/${wanted}`)) continue
+      if (output.filePath === `${folder}/${wanted}`) continue
       try {
-        await setPhotoOutput(photo.id, await renameImage(output, wanted))
+        let file = await moveImage(output, folder)
+        if (!file.filePath.endsWith(`/${wanted}`)) file = await renameImage(file, wanted)
+        await setPhotoOutput(photo.id, file, product.kind === "completed")
       } catch (err) {
         throw new StoreError(
           "invalid",
@@ -185,4 +199,46 @@ async function syncFileNames(product: Product) {
       }
     }
   }
+}
+
+export type CompletedDressInput = {
+  name: string
+  price: number
+  sizes: string[]
+  note?: string
+  colors: {
+    name: string
+    quantities: Record<string, number>
+    photos: { view: PhotoView; image: StoredImage }[]
+  }[]
+}
+
+/**
+ * Save a dress whose photos were uploaded already edited: move them into the dress's folder,
+ * name them "<dress>-<colour>-<view>", and save. Nothing is generated.
+ */
+export async function createCompletedDress(input: CompletedDressInput): Promise<Product> {
+  const handle = await freeHandle(input.name)
+  const folder = dressFolder(handle)
+  const colors = await Promise.all(
+    input.colors.map(async (color) => ({
+      ...color,
+      photos: await Promise.all(
+        color.photos.map(async (photo) => {
+          const ext = photo.image.filePath.slice(photo.image.filePath.lastIndexOf(".") + 1)
+          const name = photoFileName({ handle }, color, photo, ext.toLowerCase())
+          try {
+            const moved = await moveImage(photo.image, folder)
+            return { view: photo.view, image: await renameImage(moved, name) }
+          } catch (err) {
+            throw new StoreError(
+              "invalid",
+              `Couldn't file ${name} on ImageKit: ${toUploadError(err).message}`,
+            )
+          }
+        }),
+      ),
+    })),
+  )
+  return createCompletedProduct({ ...input, handle, colors })
 }

@@ -177,6 +177,26 @@ export async function renameImage(file: StoredImage, newFileName: string): Promi
   }
 }
 
+/** Move into `folder` (same file name). Returns the file's new path and URL. */
+export async function moveImage(file: StoredImage, folder: string): Promise<StoredImage> {
+  const name = file.filePath.slice(file.filePath.lastIndexOf("/") + 1)
+  const filePath = `${folder.replace(/\/+$/, "")}/${name}`
+  if (filePath === file.filePath) return file
+  try {
+    await getClient().files.move({ sourceFilePath: file.filePath, destinationPath: folder })
+  } catch (err) {
+    throw toUploadError(err)
+  }
+  // The URL is "<endpoint><filePath>", so swap the path part.
+  const url = new URL(file.url)
+  const encode = (p: string) => p.split("/").map(encodeURIComponent).join("/")
+  const old = encode(file.filePath)
+  if (url.pathname.endsWith(old))
+    url.pathname = url.pathname.slice(0, -old.length) + encode(filePath)
+  url.search = ""
+  return { ...file, filePath, url: url.toString(), updatedAt: new Date().toISOString() }
+}
+
 export async function deleteImage(fileId: string) {
   try {
     await getClient().files.delete(fileId)

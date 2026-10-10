@@ -99,16 +99,20 @@ export type ProductColor = {
   position: number
   /** Stock per size, e.g. { S: 2, M: 3 }. Missing sizes are 0. */
   quantities: Record<string, number>
-  /** The first colour has front + back; the others front only. */
+  /** Front first. Generated dresses: back on the first colour only; completed: any colour. */
   photos: ProductPhoto[]
 }
 
 /** generating: edits still running · attention: an edit failed · ready: every photo done. */
 export type ProductStatus = "generating" | "attention" | "ready"
 
+/** generated: the app edits the photos · completed: uploaded already edited. */
+export type ProductKind = "generated" | "completed"
+
 /** A dress, as one Shopify product: Color × Size variants with one price. */
 export type Product = {
   id: string
+  kind: ProductKind
   /** AI-generated (no colour in it), editable. Unset until the first edit names it. */
   name?: string
   /** Shopify URL handle and file name stem, e.g. "satin-wrap-midi-dress". */

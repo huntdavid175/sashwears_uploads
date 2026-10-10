@@ -102,3 +102,6 @@ CREATE TABLE IF NOT EXISTS product_photos (
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS photo_id uuid;
 
 CREATE INDEX IF NOT EXISTS jobs_photo_idx ON jobs (photo_id, created_at DESC);
+
+-- generated: photos edited by the app · completed: photos uploaded already edited.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'generated';

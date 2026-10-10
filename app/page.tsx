@@ -1,5 +1,5 @@
-import { NewDressPage } from "@/components/dresses/new-dress-form"
+import { UploadPage } from "@/components/dresses/upload-page"
 
 export default function Home() {
-  return <NewDressPage />
+  return <UploadPage />
 }

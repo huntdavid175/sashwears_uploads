@@ -21,6 +21,7 @@ function photo(view: "front" | "back", name: string): ProductPhoto {
 
 const product: Product = {
   id: "p1",
+  kind: "generated",
   name: 'Satin "Wrap" Dress',
   handle: "satin-wrap-dress",
   price: 450,

@@ -36,6 +36,7 @@ vi.mock("@/lib/openai/name", async (importOriginal) => {
 const ik = vi.hoisted(() => ({
   uploads: [] as { folder: string; fileName: string; replace: boolean }[],
   renames: [] as { filePath: string; newFileName: string }[],
+  moves: [] as { filePath: string; folder: string }[],
   deletes: [] as string[],
 }))
 
@@ -60,13 +61,19 @@ vi.mock("@/lib/imagekit", async (importOriginal) => {
       ik.renames.push({ filePath: f.filePath, newFileName })
       return file(f.filePath.replace(/[^/]+$/, newFileName))
     },
+    moveImage: async (f: { filePath: string }, folder: string) => {
+      const filePath = `${folder}/${f.filePath.slice(f.filePath.lastIndexOf("/") + 1)}`
+      if (filePath === f.filePath) return f
+      ik.moves.push({ filePath: f.filePath, folder })
+      return file(filePath)
+    },
     deleteImage: async (fileId: string) => {
       ik.deletes.push(fileId)
     },
   }
 })
 
-const { regeneratePhoto, runNext, updateProduct } = await import("./queue")
+const { createCompletedDress, regeneratePhoto, runNext, updateProduct } = await import("./queue")
 const { createProduct, getProduct } = await import("./store/products")
 const { createTemplate, updateTemplate } = await import("./store/templates")
 
@@ -76,7 +83,7 @@ beforeEach(async () => {
   db = await useTestDb()
   Object.assign(edit, { fail: false, calls: [] })
   Object.assign(naming, { name: "Satin Wrap Midi Dress", calls: 0 })
-  Object.assign(ik, { uploads: [], renames: [], deletes: [] })
+  Object.assign(ik, { uploads: [], renames: [], moves: [], deletes: [] })
 })
 
 afterEach(async () => {
@@ -124,12 +131,12 @@ describe("dress generation", () => {
     expect(edit.calls.map((c) => c.view)).toEqual(["front", "back", "front"])
     expect(edit.calls.every((c) => c.size === "1024x1536")).toBe(true)
     expect(ik.uploads.map((u) => `${u.folder}/${u.fileName}`)).toEqual([
-      "/backdrop-studio/products/satin-wrap-midi-dress-black-front.png",
-      "/backdrop-studio/products/satin-wrap-midi-dress-black-back.png",
-      "/backdrop-studio/products/satin-wrap-midi-dress-wine-red-front.png",
+      "/backdrop-studio/dresses/satin-wrap-midi-dress/satin-wrap-midi-dress-black-front.png",
+      "/backdrop-studio/dresses/satin-wrap-midi-dress/satin-wrap-midi-dress-black-back.png",
+      "/backdrop-studio/dresses/satin-wrap-midi-dress/satin-wrap-midi-dress-wine-red-front.png",
     ])
     expect(done.colors[1].photos[0].output?.filePath).toBe(
-      "/backdrop-studio/products/satin-wrap-midi-dress-wine-red-front.png",
+      "/backdrop-studio/dresses/satin-wrap-midi-dress/satin-wrap-midi-dress-wine-red-front.png",
     )
   })
 
@@ -168,7 +175,7 @@ describe("dress generation", () => {
       replace: false,
     })
     expect(ik.deletes).toEqual([
-      "id:/backdrop-studio/products/satin-wrap-midi-dress-wine-red-front.png",
+      "id:/backdrop-studio/dresses/satin-wrap-midi-dress/satin-wrap-midi-dress-wine-red-front.png",
     ])
   })
 
@@ -197,7 +204,7 @@ describe("dress generation", () => {
       "ruched-maxi-dress-burgundy-front.png",
     ])
     expect(updated.colors[1].photos[0].output?.filePath).toBe(
-      "/backdrop-studio/products/ruched-maxi-dress-burgundy-front.png",
+      "/backdrop-studio/dresses/ruched-maxi-dress/ruched-maxi-dress-burgundy-front.png",
     )
 
     // Nothing to rename when only stock changes.
@@ -207,5 +214,71 @@ describe("dress generation", () => {
     })
     expect(ik.renames).toEqual([])
     await expect(updateProduct(product.id, { name: "  " })).rejects.toThrow(/empty/)
+  })
+
+  it("renaming the dress moves its files into the new dress folder", async () => {
+    const { product } = await submitDress()
+    await drain()
+    await updateProduct(product.id, { name: "Ruched Maxi Dress" })
+    expect(ik.moves.map((m) => m.folder)).toEqual(
+      Array(3).fill("/backdrop-studio/dresses/ruched-maxi-dress"),
+    )
+  })
+})
+
+describe("completed dresses", () => {
+  const finished = (name: string) => ({
+    ...storedImage(1024, 1536, name),
+    filePath: `/backdrop-studio/_sources/${name}`,
+  })
+
+  it("files finished photos in the dress folder, named, with no edits", async () => {
+    const product = await createCompletedDress({
+      name: "Satin Wrap Midi Dress",
+      price: 300,
+      sizes: ["S", "M"],
+      colors: [
+        {
+          name: "Black",
+          quantities: { S: 1, M: 1 },
+          photos: [
+            { view: "front", image: finished("IMG_1.JPG") },
+            { view: "back", image: finished("IMG_2.JPG") },
+          ],
+        },
+        {
+          name: "Wine",
+          quantities: { S: 0, M: 2 },
+          photos: [{ view: "front", image: finished("IMG_3.jpg") }],
+        },
+      ],
+    })
+
+    expect(product).toMatchObject({
+      kind: "completed",
+      status: "ready",
+      handle: "satin-wrap-midi-dress",
+    })
+    expect(edit.calls).toEqual([])
+    expect(ik.renames.map((r) => r.newFileName)).toEqual([
+      "satin-wrap-midi-dress-black-front.jpg",
+      "satin-wrap-midi-dress-black-back.jpg",
+      "satin-wrap-midi-dress-wine-front.jpg",
+    ])
+    const back = product.colors[0].photos[1]
+    expect(back.output?.filePath).toBe(
+      "/backdrop-studio/dresses/satin-wrap-midi-dress/satin-wrap-midi-dress-black-back.jpg",
+    )
+    expect(back.source).toEqual(back.output)
+    expect(await runNext()).toBe(false)
+    await expect(regeneratePhoto(product.id, back.id)).rejects.toThrow(/already edited/)
+
+    // Renaming a colour renames its file; source follows (same file).
+    const renamed = await updateProduct(product.id, {
+      colors: [{ id: product.colors[1].id, name: "Burgundy", quantities: { S: 0, M: 2 } }],
+    })
+    const wine = renamed.colors[1].photos[0]
+    expect(wine.output?.filePath).toMatch(/satin-wrap-midi-dress-burgundy-front\.jpg$/)
+    expect(wine.source).toEqual(wine.output)
   })
 })

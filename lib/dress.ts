@@ -6,6 +6,8 @@ export const CURRENCY = process.env.NEXT_PUBLIC_CURRENCY || "USD"
 export const DEFAULT_SIZES = ["S", "M", "L", "XL", "XXL"]
 export const MAX_SIZES = 20
 export const MAX_COLORS = 20
+/** Photos in one finished-dress upload (front + back of up to 20 colours). */
+export const MAX_COMPLETED_PHOTOS = 40
 const MAX_LABEL = 40
 
 function label(value: unknown, what: string) {

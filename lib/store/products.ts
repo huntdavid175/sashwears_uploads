@@ -20,6 +20,7 @@ import { isUuid, slugify } from "./templates"
 
 type ProductRow = {
   id: string
+  kind: Product["kind"]
   name: string | null
   handle: string | null
   price: string | number
@@ -86,6 +87,7 @@ async function assemble(rows: ProductRow[]): Promise<Product[]> {
       }))
     return {
       id: r.id,
+      kind: r.kind,
       name: r.name ?? undefined,
       handle: r.handle ?? undefined,
       price: Number(r.price),
@@ -108,8 +110,9 @@ function toPhoto(p: PhotoRow): ProductPhoto {
     view: p.view,
     source: p.source,
     output: p.output ?? undefined,
-    // A photo always has a job; "queued" covers the instant between insert and first read.
-    status: p.job_status ?? "queued",
+    // Completed dresses have results but no jobs. A generated photo always has a job;
+    // "queued" covers the instant between insert and first read.
+    status: p.job_status ?? (p.output ? "done" : "queued"),
     error: p.job_error ?? undefined,
     startedAt: isoOrUndefined(p.job_started_at),
   }
@@ -241,6 +244,76 @@ export async function getPhotoContext(photoId: string) {
   return { product, color, photo }
 }
 
+export type CompletedProductInput = {
+  name: string
+  handle: string
+  price: number
+  sizes: string[]
+  note?: string
+  colors: {
+    name: string
+    quantities: Record<string, number>
+    photos: { view: PhotoView; image: StoredImage }[]
+  }[]
+}
+
+/** Save a dress uploaded already edited: its photos are both source and result, no jobs. */
+export async function createCompletedProduct(input: CompletedProductInput): Promise<Product> {
+  const productId = randomUUID()
+  const colors: { id: string; name: string; position: number; quantities: object }[] = []
+  const photos: { id: string; color_id: string; view: string; image: StoredImage }[] = []
+  input.colors.forEach((c, position) => {
+    const colorId = randomUUID()
+    colors.push({ id: colorId, name: c.name, position, quantities: c.quantities })
+    for (const p of c.photos) {
+      photos.push({ id: randomUUID(), color_id: colorId, view: p.view, image: p.image })
+    }
+  })
+  try {
+    await getDb().query(
+      `WITH p AS (
+         INSERT INTO products (id, kind, name, handle, price, sizes, note)
+         VALUES ($1, 'completed', $2, $3, $4, $5, $6) RETURNING id
+       ), c AS (
+         INSERT INTO product_colors (id, product_id, name, position, quantities)
+         SELECT x.id, (SELECT id FROM p), x.name, x.position, x.quantities
+         FROM jsonb_to_recordset($7::jsonb) AS x(id uuid, name text, position int, quantities jsonb)
+         RETURNING id
+       )
+       INSERT INTO product_photos (id, product_id, color_id, view, source, output)
+       SELECT x.id, (SELECT id FROM p), x.color_id, x.view, x.image, x.image
+       FROM jsonb_to_recordset($8::jsonb) AS x(id uuid, color_id uuid, view text, image jsonb)
+       WHERE EXISTS (SELECT 1 FROM c)`,
+      [
+        productId,
+        input.name,
+        input.handle,
+        input.price,
+        input.sizes,
+        input.note ?? null,
+        JSON.stringify(colors),
+        JSON.stringify(photos),
+      ],
+    )
+  } catch (err) {
+    if (isUniqueViolation(err)) throw new StoreError("conflict", "That dress name was just taken")
+    throw err
+  }
+  return getProduct(productId)
+}
+
+/** The first handle for `name` no dress uses yet. */
+export async function freeHandle(name: string): Promise<string> {
+  const base = slugify(name, "dress")
+  const rows = await getDb().query<{ handle: string }>(
+    "SELECT handle FROM products WHERE handle = $1 OR handle LIKE $1 || '-%'",
+    [base],
+  )
+  const taken = new Set(rows.map((r) => r.handle))
+  for (const handle of handles(name)) if (!taken.has(handle)) return handle
+  throw new Error("unreachable")
+}
+
 /** "Satin Wrap Midi Dress" → "satin-wrap-midi-dress", then "-2", "-3"… */
 function* handles(name: string) {
   const base = slugify(name, "dress")
@@ -311,11 +384,17 @@ export async function saveProduct(
   }
 }
 
-export async function setPhotoOutput(photoId: string, output: StoredImage): Promise<void> {
-  await getDb().query("UPDATE product_photos SET output = $2 WHERE id = $1", [
-    photoId,
-    JSON.stringify(output),
-  ])
+/** Record a photo's result; `alsoSource` for completed dresses, where they're the same file. */
+export async function setPhotoOutput(
+  photoId: string,
+  output: StoredImage,
+  alsoSource = false,
+): Promise<void> {
+  await getDb().query(
+    `UPDATE product_photos SET output = $2, source = CASE WHEN $3 THEN $2 ELSE source END
+     WHERE id = $1`,
+    [photoId, JSON.stringify(output), alsoSource],
+  )
 }
 
 export async function markExported(ids: string[]): Promise<void> {

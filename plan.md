@@ -111,6 +111,22 @@ plain Uploads inbox (their tables stay; nothing is deleted).
 - [x] Push
 - [ ] **You:** set a default template, submit a real dress, import the CSV into Shopify as draft
 
+## Phase 12 — Upload finished dresses
+Spec: the upload page asks **Completed dress** (photos already edited) or **Needs editing** (Phase 11 flow).
+Completed: the owner drops every photo of one dress (front/back of each colour) + price, sizes, note → the
+AI sorts them (dress name, colour + front/back per photo) → she reviews (rename colours, move photos,
+quantities) → save. No AI editing; the photos are moved into the dress's own ImageKit folder and named
+`<dress>-<colour>-<view>`. Every dress (both kinds) now lives in `/<root>/dresses/<handle>/`.
+
+- [x] DB: `products.kind` (`generated` | `completed`); photo status `done` when it has a result and no job
+- [x] `lib/openai/classify.ts`: one vision call → name + colour/view per photo (structured output)
+- [x] `POST /api/products/classify` (suggestion only, nothing saved) and `kind: "completed"` on `POST /api/products`
+- [x] ImageKit: move + rename into the dress folder; dress/colour renames keep folder + names in sync
+- [x] UI: type chooser on `/`, completed-dress upload → review → save; detail page without regenerate/compare for completed
+- [x] Tests (42) / lint / tsc / build; migration applied
+- [x] Push
+- [ ] **You:** upload one finished dress for real and check the AI's colour sorting
+
 ---
 
 ## Assumptions

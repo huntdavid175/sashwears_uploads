@@ -17,7 +17,7 @@ import {
 import { useTheme, type ThemePreference } from "@/lib/theme"
 
 const NAV = [
-  { href: "/", label: "New dress" },
+  { href: "/", label: "Upload" },
   { href: "/dresses", label: "Dresses" },
   { href: "/settings", label: "Settings" },
 ] as const
