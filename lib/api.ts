@@ -2,8 +2,10 @@ import "server-only"
 
 import { after } from "next/server"
 
+import { getStoredImage } from "@/lib/imagekit"
 import { StoreError } from "@/lib/store/errors"
-import type { TemplateInput } from "@/lib/store/templates"
+import type { TemplateImages, TemplateInput } from "@/lib/store/templates"
+import type { Template } from "@/lib/types"
 
 const STATUS: Record<StoreError["code"], number> = {
   invalid: 400,
@@ -36,11 +38,34 @@ export function templateInput(body: Record<string, unknown>): TemplateInput {
   const str = (key: string) => (typeof body[key] === "string" ? (body[key] as string) : undefined)
   return {
     name: str("name"),
+    kind: str("kind") as TemplateInput["kind"],
     prompt: str("prompt"),
     model: str("model") as TemplateInput["model"],
     quality: str("quality") as TemplateInput["quality"],
     outputFormat: str("outputFormat") as TemplateInput["outputFormat"],
   }
+}
+
+/**
+ * The shots in a template body, `shots: [{ name, fileId } | { name, key }]`, looked up: a
+ * `fileId` is a newly uploaded reference, a `key` keeps that shot's current one. Absent →
+ * `{}` (the shots stay as they are).
+ */
+export async function templateImages(
+  body: Record<string, unknown>,
+  current?: Template,
+): Promise<TemplateImages> {
+  if (!Array.isArray(body.shots)) return {}
+  const shots = await Promise.all(
+    body.shots.map(async (s: { name?: unknown; fileId?: unknown; key?: unknown }) => {
+      const name = typeof s?.name === "string" ? s.name : ""
+      if (typeof s?.fileId === "string") return { name, reference: await getStoredImage(s.fileId) }
+      const kept = current?.shots.find((c) => c.key === s?.key)
+      if (!kept) throw new StoreError("invalid", `Add a photo for the ${name || "new"} shot`)
+      return { name, reference: kept.reference }
+    }),
+  )
+  return { shots }
 }
 
 /** Drop undefined keys so `{...current, ...input}` doesn't clobber existing values. */

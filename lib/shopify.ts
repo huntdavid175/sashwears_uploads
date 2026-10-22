@@ -1,3 +1,4 @@
+import { stockSizes } from "@/lib/dress"
 import type { Product, StoredImage } from "@/lib/types"
 
 /**
@@ -5,14 +6,16 @@ import type { Product, StoredImage } from "@/lib/types"
  * Shopify's product_template.csv on 2026-10-10. Only the columns we fill are included;
  * Shopify accepts a subset as long as "Title" is present.
  *
- * Layout per dress: one row per Color × Size variant (Option1 = Color, Option2 = Size), the
- * first row also carries the product fields and option names. Product images go on rows by
- * position (extra rows hold only the handle and image when there are more images than variants).
- * Each colour's front photo is that colour's variant image. Products import as drafts.
+ * Layout per product: one row per Color × Size variant (Option1 = Color, Option2 = Size; just
+ * Color for one-size products), the first row also carries the product fields and option names.
+ * Product images go on rows by position (extra rows hold only the handle and image when there
+ * are more images than variants). Each colour's first finished photo (its front, usually) is that
+ * colour's variant image. Products import as drafts.
  */
 export const SHOPIFY_COLUMNS = [
   "Title",
   "URL handle",
+  "Type",
   "Status",
   "Published on online store",
   "Option1 name",
@@ -41,15 +44,15 @@ function original(image: StoredImage) {
   return url.toString()
 }
 
-/** Throws if a dress isn't ready to export (unnamed or missing results). */
+/** Throws if a product isn't ready to export (unnamed or missing results). */
 export function assertExportable(product: Product) {
-  const label = product.name ?? "A dress"
+  const label = product.name ?? "A product"
   if (!product.name || !product.handle) throw new Error(`${label} hasn't been named yet`)
   if (product.status !== "ready")
     throw new Error(`${label} is still generating or has failed photos`)
   for (const color of product.colors) {
-    if (!color.photos.find((p) => p.view === "front")?.output) {
-      throw new Error(`${label}: ${color.name} has no finished front photo`)
+    if (!color.photos.some((p) => p.output)) {
+      throw new Error(`${label}: ${color.name} has no finished photo`)
     }
   }
 }
@@ -66,18 +69,19 @@ export function productRows(product: Product): Row[] {
       })),
   )
 
+  const sized = product.sizes.length > 0
   const variants: Row[] = product.colors.flatMap((color) => {
-    const front = color.photos.find((p) => p.view === "front")!.output!
-    return product.sizes.map((size) => ({
+    const cover = color.photos.find((p) => p.output)!.output!
+    return stockSizes(product.sizes).map((size) => ({
       "URL handle": handle,
       "Option1 value": color.name,
-      "Option2 value": size,
+      "Option2 value": sized ? size : undefined,
       Price: product.price.toFixed(2),
       "Inventory tracker": "shopify",
       "Inventory quantity": color.quantities[size] ?? 0,
       "Continue selling when out of stock": "deny",
       "Requires shipping": "TRUE",
-      "Variant image URL": original(front),
+      "Variant image URL": original(cover),
     }))
   })
 
@@ -92,10 +96,11 @@ export function productRows(product: Product): Row[] {
   })
   Object.assign(rows[0], {
     Title: product.name,
+    Type: product.productType,
     Status: "draft",
     "Published on online store": "TRUE",
     "Option1 name": "Color",
-    "Option2 name": "Size",
+    "Option2 name": sized ? "Size" : undefined,
   })
   return rows
 }

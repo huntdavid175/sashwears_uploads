@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 
-import type { Product, StoredImage, Template } from "@/lib/types"
+import type { PhotoView, Product, Shoot, Shot, StoredImage, Template } from "@/lib/types"
 
 /** fetch + JSON, throwing the server's `{ error }` message on failure. */
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
@@ -122,6 +122,46 @@ export function useProducts() {
   return { products: data, error, refresh }
 }
 
+export function useShoot(id: string) {
+  const { data, error, refresh, setData } = usePolled<Shoot>(
+    `/api/shoots/${encodeURIComponent(id)}`,
+    (s) => s.status === "generating",
+  )
+  return { shoot: data, error, refresh, setShoot: setData }
+}
+
+export type SortedPhoto = {
+  fileId: string
+  originalName: string
+  image: StoredImage
+  view: PhotoView
+}
+
+export type Classified = {
+  name: string
+  productType: string
+  description: string
+  /** The shots the photos were sorted into (the template's, or the default ones). */
+  shots: Shot[]
+  warning?: string
+  photos: (SortedPhoto & { color: string })[]
+}
+
+/**
+ * Ask the AI how uploaded photos group into colours and shots: the template's shots when
+ * `templateId` is given; `describe` also asks for a shop description.
+ */
+export function classifyPhotos(
+  files: { fileId: string; originalName: string }[],
+  opts: { templateId?: string; describe?: boolean } = {},
+) {
+  return api<Classified>("/api/products/classify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ files, templateId: opts.templateId, describe: opts.describe }),
+  })
+}
+
 export function useProduct(id: string) {
   const { data, error, refresh, setData } = usePolled<Product>(
     `/api/products/${encodeURIComponent(id)}`,
@@ -144,7 +184,12 @@ export async function exportToShopify(ids: string[]) {
   const name =
     /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ??
     "shopify-products.csv"
-  const url = URL.createObjectURL(await res.blob())
+  saveBlob(await res.blob(), name)
+}
+
+/** Hand the browser a file to save. */
+function saveBlob(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url
   a.download = name
@@ -152,6 +197,49 @@ export async function exportToShopify(ids: string[]) {
   a.click()
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}
+
+/**
+ * Save a shoot as "<handle>.zip": one "<handle>/" folder with every finished image (original
+ * bytes, straight from ImageKit) and description.txt. Zipped in the browser: Vercel caps
+ * function responses at ~4.5MB.
+ */
+export async function downloadShootZip(
+  shoot: Shoot,
+  onProgress?: (done: number, total: number) => void,
+) {
+  const { strToU8, zipSync } = await import("fflate")
+  const outputs = shoot.colors.flatMap((c) => c.images.flatMap((i) => (i.output ? [i.output] : [])))
+  const files: Record<string, Uint8Array> = {}
+  let done = 0
+  onProgress?.(0, outputs.length)
+  await Promise.all(
+    outputs.map(async (output) => {
+      const name = output.filePath.slice(output.filePath.lastIndexOf("/") + 1)
+      const url = new URL(output.url)
+      url.search = ""
+      url.searchParams.set("tr", "orig-true")
+      url.searchParams.set("v", String(Date.parse(output.updatedAt) || 0))
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`Couldn't download ${name} (HTTP ${res.status})`)
+      files[`${shoot.handle}/${name}`] = new Uint8Array(await res.arrayBuffer())
+      onProgress?.(++done, outputs.length)
+    }),
+  )
+  const text = [
+    shoot.name,
+    "",
+    shoot.description,
+    "",
+    `Colours: ${shoot.colors.map((c) => c.name).join(", ")}`,
+    "",
+  ].join("\n")
+  files[`${shoot.handle}/description.txt`] = strToU8(text)
+  // Images are already compressed: store them as they are.
+  saveBlob(
+    new Blob([zipSync(files, { level: 0 })], { type: "application/zip" }),
+    `${shoot.handle}.zip`,
+  )
 }
 
 /** Read width/height in the browser so we can show size and cost before uploading. */

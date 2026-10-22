@@ -10,10 +10,10 @@ import { getClient } from "./edit"
 export const NAMING_MODEL = process.env.OPENAI_NAMING_MODEL || "gpt-5.4-mini"
 
 const NAMING_PROMPT = [
-  "Name the dress (or main garment) in this product photo for an online catalog.",
-  "It is sold in several colors, so do NOT mention any color.",
-  "Use 2 to 5 words in Title Case: fabric or pattern, then silhouette or style, ending with the",
-  'garment type, e.g. "Satin Wrap Midi Dress" or "Ruched Bodycon Maxi Dress".',
+  "Name the main product in this photo (clothing, a bag, shoes or an accessory) for an online",
+  "catalog. It is sold in several colors, so do NOT mention any color.",
+  "Use 2 to 5 words in Title Case: material or pattern, then style, ending with the product",
+  'type, e.g. "Satin Wrap Midi Dress" or "Woven Raffia Tote Bag".',
   "Describe only what is visible. No brand names, quotes, emoji or punctuation.",
   "Reply with the name only.",
 ].join(" ")

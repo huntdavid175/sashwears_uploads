@@ -4,7 +4,7 @@ import OpenAI, { APIConnectionError, APIError, toFile } from "openai"
 
 import { extForFormat, MIME_BY_FORMAT, readImageInfo } from "@/lib/image"
 import { MODEL_CAPS } from "@/lib/models"
-import type { PhotoView, TemplateSettings } from "@/lib/types"
+import type { GarmentRole, PhotoView, TemplateKind, TemplateSettings } from "@/lib/types"
 
 let client: OpenAI | undefined
 
@@ -44,6 +44,45 @@ export function composePrompt(templatePrompt: string, view?: PhotoView) {
   ].join("\n")
 }
 
+const PRODUCT_LINES: Record<GarmentRole, (shot: string) => string> = {
+  garment: (shot) =>
+    `shows the product (${shot} view): reproduce exactly this product. Copy its shape, proportions, cut, material, texture, color, pattern, print, hardware, stitching, trims, fastenings, logos and any text exactly.`,
+  colour: (shot) =>
+    `shows the same product in the same color (${shot} view): match its exact color, material, texture and finish.`,
+  design: (shot) =>
+    `shows the ${shot} view of the same product design in a DIFFERENT color: copy how it looks from this side (construction, openings, straps, handles, pockets, zips, fastenings, seams and details) but NOT its color.`,
+}
+
+/**
+ * Framing for a set image: image 1 is the template's reference for this shot (the model in
+ * that pose, or the scene), the rest are product photos in `inputs` order. Template prompt is
+ * appended.
+ */
+export function composeShootPrompt(
+  templatePrompt: string,
+  opts: {
+    kind: TemplateKind
+    /** The shot's name, e.g. "Back" or "Side". */
+    shot: string
+    inputs: { role: GarmentRole; viewName: string }[]
+  },
+) {
+  const { kind, shot, inputs } = opts
+  return [
+    `You are given ${inputs.length + 1} images. The result is the "${shot}" shot of a product set.`,
+    kind === "model"
+      ? "Image 1 is the MODEL in the pose for this shot. Keep this person exactly as they are: same face, hair, skin, body, pose and expression. Keep the photo's setting, background, lighting, camera angle and framing. Keep the pose: if the model faces away, show the product from behind and do not turn them around."
+      : "Image 1 is the SCENE for this shot. Keep its setting, surfaces, props, background, lighting, color grading, camera angle and framing exactly.",
+    ...inputs.map((input, i) => `Image ${i + 2} ${PRODUCT_LINES[input.role](input.viewName)}`),
+    kind === "model"
+      ? "Put this product on the model the way it is meant to be used: worn if it is clothing, footwear or jewelry; held, carried or worn on the shoulder if it is a bag or accessory. Replace any clothing or item it takes the place of. Fit it naturally to their body and pose, with realistic drape, folds, shadows and lighting that match the photo."
+      : `Place this product in the scene as its hero, seen from the ${shot} side, at a natural size and position for the setting, with contact shadows, reflections and lighting that match the scene.`,
+    "Do not restyle, recolor or redesign the product. Return a single photorealistic image.",
+    "",
+    `Additional instructions: ${templatePrompt.trim()}`,
+  ].join("\n")
+}
+
 export async function editImage(opts: {
   settings: TemplateSettings
   source: Buffer
@@ -51,16 +90,30 @@ export async function editImage(opts: {
   size: string
   view?: PhotoView
 }): Promise<Buffer> {
+  return editImages({
+    settings: opts.settings,
+    images: [opts.source, opts.reference],
+    prompt: composePrompt(opts.settings.prompt, opts.view),
+    size: opts.size,
+  })
+}
+
+/** One edit from several input images, in the order the prompt describes them. */
+export async function editImages(opts: {
+  settings: TemplateSettings
+  images: Buffer[]
+  prompt: string
+  size: string
+}): Promise<Buffer> {
   const { settings } = opts
   const caps = MODEL_CAPS[settings.model]
-  const source = await asUpload(opts.source, "source")
-  const reference = await asUpload(opts.reference, "reference")
+  const images = await Promise.all(opts.images.map((data, i) => asUpload(data, `image-${i + 1}`)))
 
   try {
     const res = await getClient().images.edit({
       model: settings.model,
-      image: [source, reference],
-      prompt: composePrompt(settings.prompt, opts.view),
+      image: images,
+      prompt: opts.prompt,
       quality: settings.quality,
       size: opts.size,
       output_format: settings.outputFormat,

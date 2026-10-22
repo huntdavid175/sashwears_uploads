@@ -3,6 +3,7 @@ import "server-only"
 import { randomUUID } from "node:crypto"
 
 import { getDb, iso, isoOrUndefined, isUniqueViolation } from "@/lib/db"
+import { DEFAULT_SHOTS } from "@/lib/shoot"
 import type {
   Job,
   PhotoView,
@@ -23,6 +24,7 @@ type ProductRow = {
   kind: Product["kind"]
   name: string | null
   handle: string | null
+  product_type: string | null
   price: string | number
   sizes: string[]
   note: string | null
@@ -82,7 +84,7 @@ async function assemble(rows: ProductRow[]): Promise<Product[]> {
         quantities: c.quantities,
         photos: photos
           .filter((p) => p.color_id === c.id)
-          .sort((a, b) => (a.view === b.view ? 0 : a.view === "front" ? -1 : 1))
+          .sort((a, b) => shotOrder(a.view) - shotOrder(b.view))
           .map(toPhoto),
       }))
     return {
@@ -90,6 +92,7 @@ async function assemble(rows: ProductRow[]): Promise<Product[]> {
       kind: r.kind,
       name: r.name ?? undefined,
       handle: r.handle ?? undefined,
+      productType: r.product_type ?? undefined,
       price: Number(r.price),
       sizes: r.sizes,
       note: r.note ?? undefined,
@@ -101,6 +104,12 @@ async function assemble(rows: ProductRow[]): Promise<Product[]> {
       status: statusOf(productColors),
     }
   })
+}
+
+/** Front, back, side, inside, detail, then anything else. */
+function shotOrder(view: string) {
+  const i = DEFAULT_SHOTS.findIndex((s) => s.key === view)
+  return i === -1 ? DEFAULT_SHOTS.length : i
 }
 
 function toPhoto(p: PhotoRow): ProductPhoto {
@@ -246,6 +255,7 @@ export async function getPhotoContext(photoId: string) {
 
 export type CompletedProductInput = {
   name: string
+  productType?: string
   handle: string
   price: number
   sizes: string[]
@@ -272,8 +282,8 @@ export async function createCompletedProduct(input: CompletedProductInput): Prom
   try {
     await getDb().query(
       `WITH p AS (
-         INSERT INTO products (id, kind, name, handle, price, sizes, note)
-         VALUES ($1, 'completed', $2, $3, $4, $5, $6) RETURNING id
+         INSERT INTO products (id, kind, name, handle, price, sizes, note, product_type)
+         VALUES ($1, 'completed', $2, $3, $4, $5, $6, $9) RETURNING id
        ), c AS (
          INSERT INTO product_colors (id, product_id, name, position, quantities)
          SELECT x.id, (SELECT id FROM p), x.name, x.position, x.quantities
@@ -293,10 +303,11 @@ export async function createCompletedProduct(input: CompletedProductInput): Prom
         input.note ?? null,
         JSON.stringify(colors),
         JSON.stringify(photos),
+        input.productType ?? null,
       ],
     )
   } catch (err) {
-    if (isUniqueViolation(err)) throw new StoreError("conflict", "That dress name was just taken")
+    if (isUniqueViolation(err)) throw new StoreError("conflict", "That name was just taken")
     throw err
   }
   return getProduct(productId)
@@ -358,6 +369,7 @@ export async function saveProduct(
   patch: {
     name?: string
     handle?: string
+    productType?: string
     price?: number
     sizes?: string[]
     colors?: { id: string; name: string; quantities: Record<string, number> }[]
@@ -366,9 +378,17 @@ export async function saveProduct(
   try {
     await getDb().query(
       `UPDATE products SET name = COALESCE($2, name), handle = COALESCE($3, handle),
-         price = COALESCE($4, price), sizes = COALESCE($5, sizes), updated_at = now()
+         price = COALESCE($4, price), sizes = COALESCE($5, sizes),
+         product_type = COALESCE(NULLIF($6, ''), product_type), updated_at = now()
        WHERE id = $1`,
-      [id, patch.name ?? null, patch.handle ?? null, patch.price ?? null, patch.sizes ?? null],
+      [
+        id,
+        patch.name ?? null,
+        patch.handle ?? null,
+        patch.price ?? null,
+        patch.sizes ?? null,
+        patch.productType ?? null,
+      ],
     )
   } catch (err) {
     if (isUniqueViolation(err)) throw new StoreError("conflict", "That name was just taken")

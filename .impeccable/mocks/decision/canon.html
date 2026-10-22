@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Category standard — review</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#f6f6f7; --ink:#1a1a1a; --blue:#2c6ecb; --line:#e3e3e3; --muted:#6d7175; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { width:1440px; height:900px; overflow:hidden; font-family:Inter, sans-serif; background:var(--bg); color:var(--ink); display:grid; grid-template-columns:240px 1fr; }
+  .side { background:#ebebeb; padding:20px 12px; display:flex; flex-direction:column; gap:4px; }
+  .brand { font-weight:700; font-size:18px; padding:4px 10px 18px; }
+  .side a { padding:8px 10px; border-radius:8px; font-size:14px; color:#303030; }
+  .side a.on { background:#fff; font-weight:600; }
+  main { padding:28px 40px; display:grid; grid-template-columns:1fr 340px; gap:20px; align-content:start; }
+  .bar { grid-column:1 / -1; display:flex; justify-content:space-between; align-items:center; }
+  h1 { font-size:24px; font-weight:700; }
+  .btn { background:var(--ink); color:#fff; border-radius:8px; padding:9px 16px; font-size:14px; font-weight:600; }
+  .card { background:#fff; border-radius:12px; box-shadow:0 1px 0 rgba(0,0,0,.08), 0 0 0 1px var(--line); padding:18px; }
+  .card h2 { font-size:15px; font-weight:600; margin-bottom:12px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th { text-align:left; color:var(--muted); font-weight:500; padding:8px; border-bottom:1px solid var(--line); }
+  td { padding:10px 8px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  .th { width:40px; height:52px; border-radius:6px; display:inline-block; }
+  .badge { border-radius:999px; padding:2px 10px; font-size:12px; font-weight:500; background:#e4e5e7; }
+  .badge.info { background:#e0ecff; color:#1f4f9a; }
+  .field { border:1px solid #c9cccf; border-radius:8px; padding:9px 12px; font-size:14px; margin:6px 0 14px; }
+  label { font-size:13px; font-weight:500; }
+  .desc { height:110px; color:#444; line-height:1.45; }
+  .sum { display:flex; justify-content:space-between; font-size:14px; padding:6px 0; color:var(--muted); }
+  .sum b { color:var(--ink); }
+</style>
+</head>
+<body>
+  <aside class="side"><div class="brand">Backdrop Studio</div><a class="on">New set</a><a>Products</a><a>Templates</a></aside>
+  <main>
+    <div class="bar"><h1>Review: Satin Wrap Midi Dress</h1><span class="btn">Generate 6 images</span></div>
+    <section class="card">
+      <h2>What will be made</h2>
+      <table>
+        <tr><th>Colour</th><th>Shot</th><th>Your photo</th><th>Made from</th></tr>
+        <tr><td>Black</td><td>Front</td><td><span class="th" style="background:#222"></span></td><td><span class="badge">Your photo</span></td></tr>
+        <tr><td>Black</td><td>Back</td><td><span class="th" style="background:#2b2b2b"></span></td><td><span class="badge">Your photo</span></td></tr>
+        <tr><td>Wine Red</td><td>Front</td><td><span class="th" style="background:#6e1a2b"></span></td><td><span class="badge">Your photo</span></td></tr>
+        <tr><td>Wine Red</td><td>Back</td><td>—</td><td><span class="badge info">Black’s back design</span></td></tr>
+        <tr><td>Emerald</td><td>Front</td><td><span class="th" style="background:#1f6b4a"></span></td><td><span class="badge">Your photo</span></td></tr>
+        <tr><td>Emerald</td><td>Back</td><td>—</td><td><span class="badge info">Black’s back design</span></td></tr>
+      </table>
+    </section>
+    <section class="card">
+      <h2>Details</h2>
+      <label>Name</label><div class="field">Satin Wrap Midi Dress</div>
+      <label>Description</label><div class="field desc">A satin midi dress with a wrap front, V-neckline and flutter sleeves. Comes in Black, Wine Red and Emerald.</div>
+      <div class="sum"><span>Template</span><b>Ama · on a model</b></div>
+      <div class="sum"><span>Images</span><b>6</b></div>
+      <div class="sum"><span>Estimated cost</span><b>US$1.32</b></div>
+    </section>
+  </main>
+</body>
+</html>

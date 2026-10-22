@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { storedImage } from "@/test/db"
 
+import { ONE_SIZE } from "./dress"
 import { SHOPIFY_COLUMNS, toShopifyCsv } from "./shopify"
 import type { Product, ProductPhoto } from "./types"
 
@@ -117,6 +118,21 @@ describe("toShopifyCsv", () => {
     expect(r).toHaveLength(2)
     expect(get(r[1], "Option1 value")).toBe("")
     expect(get(r[1], "Image position")).toBe("2")
+  })
+
+  it("exports one-size products (a bag) as Color-only variants with their type", () => {
+    const bag: Product = {
+      ...product,
+      name: "Woven Raffia Tote Bag",
+      productType: "Tote Bag",
+      sizes: [],
+      colors: [{ ...product.colors[0], quantities: { [ONE_SIZE]: 4 } }],
+    }
+    const r = parse(toShopifyCsv([bag])).slice(1)
+    expect(get(r[0], "Type")).toBe("Tote Bag")
+    expect([get(r[0], "Option1 name"), get(r[0], "Option2 name")]).toEqual(["Color", ""])
+    expect([get(r[0], "Option1 value"), get(r[0], "Option2 value")]).toEqual(["Black", ""])
+    expect(get(r[0], "Inventory quantity")).toBe("4")
   })
 
   it("refuses dresses that aren't ready", () => {

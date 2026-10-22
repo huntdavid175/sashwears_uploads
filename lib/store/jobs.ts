@@ -20,6 +20,7 @@ type Row = {
   original_name: string
   source: StoredImage
   photo_id: string | null
+  shoot_image_id: string | null
   size: string | null
   status: Job["status"]
   error: string | null
@@ -37,6 +38,7 @@ function toJob(r: Row): Job {
     originalName: r.original_name,
     source: r.source,
     photoId: r.photo_id ?? undefined,
+    shootImageId: r.shoot_image_id ?? undefined,
     size: r.size ?? undefined,
     status: r.status,
     error: r.error ?? undefined,
@@ -57,16 +59,17 @@ export async function getJob(id: string): Promise<Job> {
 /** Build a queued job for a template from an image already on ImageKit. */
 export function newJob(
   template: Template,
-  input: { originalName: string; source: StoredImage; photoId?: string },
+  input: { originalName: string; source: StoredImage; photoId?: string; shootImageId?: string },
 ): Job {
-  const { name, slug, prompt, model, quality, outputFormat, reference } = template
+  const { name, slug, prompt, kind, model, quality, outputFormat, reference, shots } = template
   return {
     id: randomUUID(),
     templateId: template.id,
-    templateSnapshot: { name, slug, prompt, model, quality, outputFormat, reference },
+    templateSnapshot: { name, slug, prompt, kind, model, quality, outputFormat, reference, shots },
     originalName: input.originalName,
     source: input.source,
     photoId: input.photoId,
+    shootImageId: input.shootImageId,
     status: "queued",
     attempts: 0,
     createdAt: new Date().toISOString(),
@@ -85,16 +88,41 @@ export async function addJobs(jobs: Job[]): Promise<void> {
       j.originalName,
       JSON.stringify(j.source),
       j.photoId ?? null,
+      j.shootImageId ?? null,
       j.createdAt,
     )
     const p = (n: number) => `$${at + n}`
-    return `(${p(1)}, ${p(2)}, ${p(3)}, ${p(4)}, ${p(5)}, ${p(6)}, 'queued', ${p(7)})`
+    return `(${p(1)}, ${p(2)}, ${p(3)}, ${p(4)}, ${p(5)}, ${p(6)}, ${p(7)}, 'queued', ${p(8)})`
   })
   await getDb().query(
-    `INSERT INTO jobs (id, template_id, template_snapshot, original_name, source, photo_id, status,
-       created_at) VALUES ${values.join(", ")}`,
+    `INSERT INTO jobs (id, template_id, template_snapshot, original_name, source, photo_id,
+       shoot_image_id, status, created_at) VALUES ${values.join(", ")}`,
     params,
   )
+}
+
+/** The latest job for a shoot image. */
+export async function latestShootJob(shootImageId: string): Promise<Job | null> {
+  const [row] = await getDb().query<Row>(
+    "SELECT * FROM jobs WHERE shoot_image_id = $1 ORDER BY created_at DESC LIMIT 1",
+    [shootImageId],
+  )
+  return row ? toJob(row) : null
+}
+
+/** A fresh queued copy of `job`: same inputs, same template snapshot. */
+export function againJob(job: Job): Job {
+  return {
+    ...job,
+    id: randomUUID(),
+    size: undefined,
+    status: "queued",
+    error: undefined,
+    attempts: 0,
+    createdAt: new Date().toISOString(),
+    startedAt: undefined,
+    finishedAt: undefined,
+  }
 }
 
 /**

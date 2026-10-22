@@ -1,0 +1,89 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/assigned.html"
+        ],
+        "createdAt": "2026-10-22T12:12:50.478Z",
+        "reason": "Claude: throwaway decision-round sketch already served for choosing a direction; never shipped, deleted after the round"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/model-pick.html"
+        ],
+        "createdAt": "2026-10-22T12:12:50.721Z",
+        "reason": "Claude: throwaway decision-round sketch already served for choosing a direction; never shipped, deleted after the round"
+      },
+      {
+        "rule": "skipped-heading",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/challenger-density.html"
+        ],
+        "createdAt": "2026-10-22T12:12:50.960Z",
+        "reason": "Claude: throwaway decision-round sketch already served for choosing a direction; never shipped, deleted after the round"
+      },
+      {
+        "rule": "low-contrast",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/challenger-gate.html"
+        ],
+        "createdAt": "2026-10-22T12:12:51.226Z",
+        "reason": "Claude: throwaway decision-round sketch already served for choosing a direction; never shipped, deleted after the round"
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "files": [
+          ".impeccable/mocks/decision/canon.html"
+        ],
+        "createdAt": "2026-10-22T12:12:51.462Z",
+        "reason": "Claude: canon card deliberately shows the category standard (Inter); throwaway sketch, never shipped"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/model-pick.html"
+        ],
+        "createdAt": "2026-10-22T12:45:33.902Z",
+        "reason": "Claude: spent decision-round sketch of a direction not chosen (or the chosen one's thumbnail); never shipped, fonts predate DESIGN.md"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/challenger-density.html"
+        ],
+        "createdAt": "2026-10-22T12:45:34.509Z",
+        "reason": "Claude: spent decision-round sketch of a direction not chosen (or the chosen one's thumbnail); never shipped, fonts predate DESIGN.md"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/challenger-gate.html"
+        ],
+        "createdAt": "2026-10-22T12:45:35.078Z",
+        "reason": "Claude: spent decision-round sketch of a direction not chosen (or the chosen one's thumbnail); never shipped, fonts predate DESIGN.md"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/canon.html"
+        ],
+        "createdAt": "2026-10-22T12:45:35.545Z",
+        "reason": "Claude: spent decision-round sketch of a direction not chosen (or the chosen one's thumbnail); never shipped, fonts predate DESIGN.md"
+      }
+    ]
+  }
+}

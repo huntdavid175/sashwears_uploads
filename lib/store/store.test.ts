@@ -38,7 +38,7 @@ const ref = () => storedImage(1024, 1024)
 describe("templates", () => {
   it("creates with defaults, slug and reference; the first one is the default", async () => {
     const reference = ref()
-    const t = await createTemplate({ name: "Beach Day", prompt: "sunny" }, reference)
+    const t = await createTemplate({ name: "Beach Day", prompt: "sunny" }, { reference })
     expect(t).toMatchObject({
       name: "Beach Day",
       slug: "beach-day",
@@ -49,41 +49,50 @@ describe("templates", () => {
       isDefault: true,
     })
     expect(await getTemplate(t.id)).toEqual(t)
-    const second = await createTemplate({ name: "Studio", prompt: "p" }, ref())
+    const second = await createTemplate({ name: "Studio", prompt: "p" }, { reference: ref() })
     expect(second.isDefault).toBe(false)
   })
 
   it("enforces required fields and case-insensitive unique names", async () => {
-    await expect(createTemplate({ name: " ", prompt: "p" }, ref())).rejects.toThrow(/Name/)
-    await expect(createTemplate({ name: "A", prompt: "" }, ref())).rejects.toThrow(/Prompt/)
-    await createTemplate({ name: "Studio", prompt: "p" }, ref())
-    await expect(createTemplate({ name: "studio ", prompt: "p" }, ref())).rejects.toMatchObject({
+    await expect(createTemplate({ name: " ", prompt: "p" }, { reference: ref() })).rejects.toThrow(
+      /Name/,
+    )
+    await expect(createTemplate({ name: "A", prompt: "" }, { reference: ref() })).rejects.toThrow(
+      /Prompt/,
+    )
+    await createTemplate({ name: "Studio", prompt: "p" }, { reference: ref() })
+    await expect(
+      createTemplate({ name: "studio ", prompt: "p" }, { reference: ref() }),
+    ).rejects.toMatchObject({
       code: "conflict",
     })
   })
 
   it("rejects unknown models and unsupported qualities", async () => {
     await expect(
-      createTemplate({ name: "X", prompt: "p", model: "dall-e" as never }, ref()),
+      createTemplate({ name: "X", prompt: "p", model: "dall-e" as never }, { reference: ref() }),
     ).rejects.toThrow(/Unknown model/)
     await expect(
-      createTemplate({ name: "X", prompt: "p", model: "gpt-image-2", quality: "max" }, ref()),
+      createTemplate(
+        { name: "X", prompt: "p", model: "gpt-image-2", quality: "max" },
+        { reference: ref() },
+      ),
     ).rejects.toThrow(/doesn't support/)
   })
 
   it("updates fields, keeps its own name, swaps the reference, unique slugs", async () => {
-    const t = await createTemplate({ name: "Studio", prompt: "p" }, ref())
+    const t = await createTemplate({ name: "Studio", prompt: "p" }, { reference: ref() })
     const next = ref()
-    const u = await updateTemplate(t.id, { name: "studio", prompt: "new" }, next)
+    const u = await updateTemplate(t.id, { name: "studio", prompt: "new" }, { reference: next })
     expect(u).toMatchObject({ name: "studio", slug: "studio", prompt: "new", reference: next })
-    const other = await createTemplate({ name: "Other", prompt: "p" }, ref())
+    const other = await createTemplate({ name: "Other", prompt: "p" }, { reference: ref() })
     expect((await updateTemplate(other.id, { name: "Studio!" })).slug).toBe("studio-2")
   })
 
   it("switches the default, falls back after deleting it, and errors with none", async () => {
-    await expect(getDefaultTemplate()).rejects.toThrow(/Settings/)
-    const a = await createTemplate({ name: "A", prompt: "p" }, ref())
-    const b = await createTemplate({ name: "B", prompt: "p" }, ref())
+    await expect(getDefaultTemplate()).rejects.toThrow(/Templates/)
+    const a = await createTemplate({ name: "A", prompt: "p" }, { reference: ref() })
+    const b = await createTemplate({ name: "B", prompt: "p" }, { reference: ref() })
     expect((await getDefaultTemplate()).id).toBe(a.id)
     await setDefaultTemplate(b.id)
     expect((await getDefaultTemplate()).id).toBe(b.id)
@@ -118,7 +127,7 @@ function dress(colors = 2): NewProductInput {
 
 describe("products", () => {
   it("saves a dress with colours, photos and one queued job per photo", async () => {
-    const t = await createTemplate({ name: "Studio", prompt: "p" }, ref())
+    const t = await createTemplate({ name: "Studio", prompt: "p" }, { reference: ref() })
     const { product, jobs } = await createProduct(dress(3), t)
 
     expect(product).toMatchObject({ price: 450, sizes: ["S", "M", "L"], status: "generating" })
@@ -137,7 +146,7 @@ describe("products", () => {
   })
 
   it("names once, with unique handles, and plans renames", async () => {
-    const t = await createTemplate({ name: "Studio", prompt: "p" }, ref())
+    const t = await createTemplate({ name: "Studio", prompt: "p" }, { reference: ref() })
     const a = (await createProduct(dress(1), t)).product
     const b = (await createProduct(dress(1), t)).product
 
@@ -151,7 +160,7 @@ describe("products", () => {
   })
 
   it("derives status from the latest job of each photo", async () => {
-    const t = await createTemplate({ name: "Studio", prompt: "p" }, ref())
+    const t = await createTemplate({ name: "Studio", prompt: "p" }, { reference: ref() })
     const { product } = await createProduct(dress(1), t)
     await db.pg.query("UPDATE jobs SET status = 'done'")
     expect((await getProduct(product.id)).status).toBe("ready")
@@ -168,7 +177,7 @@ describe("products", () => {
   })
 
   it("deletes a dress with its colours, photos and jobs", async () => {
-    const t = await createTemplate({ name: "Studio", prompt: "p" }, ref())
+    const t = await createTemplate({ name: "Studio", prompt: "p" }, { reference: ref() })
     const { product } = await createProduct(dress(2), t)
     const photos = await deleteProduct(product.id)
     expect(photos).toHaveLength(3)
@@ -180,7 +189,7 @@ describe("products", () => {
 
 describe("jobs", () => {
   it("claims oldest first, never more than the limit at once", async () => {
-    const t = await createTemplate({ name: "Studio", prompt: "p" }, ref())
+    const t = await createTemplate({ name: "Studio", prompt: "p" }, { reference: ref() })
     const jobs = [1, 2, 3].map((i) =>
       newJob(t, { originalName: `${i}.png`, source: storedImage() }),
     )
@@ -196,7 +205,7 @@ describe("jobs", () => {
   })
 
   it("fails jobs stuck in processing past the timeout", async () => {
-    const t = await createTemplate({ name: "Studio", prompt: "p" }, ref())
+    const t = await createTemplate({ name: "Studio", prompt: "p" }, { reference: ref() })
     const job = newJob(t, { originalName: "a.png", source: storedImage() })
     await addJobs([job])
     await claimNextJob(2)

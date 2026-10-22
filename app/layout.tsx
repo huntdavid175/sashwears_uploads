@@ -9,7 +9,7 @@ import { THEME_SCRIPT } from "@/lib/theme-script"
 
 import "./globals.css"
 
-// Variable width axis: condensed for template names, normal for everything else.
+// Variable width axis: heavy condensed for page, product and template titles; normal elsewhere.
 const archivo = Archivo({
   variable: "--font-archivo",
   subsets: ["latin"],

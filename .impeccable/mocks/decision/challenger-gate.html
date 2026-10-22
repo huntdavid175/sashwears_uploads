@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gate Board — set</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;800&family=Barlow+Condensed:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root { --board:#121212; --paper:#f5f5f2; --amber:#ffcc00; --row:#1d1d1d; --muted:#6b6b67; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { width:1440px; height:900px; overflow:hidden; font-family:Barlow, sans-serif; background:var(--paper); color:var(--board); display:grid; grid-template-columns:420px 1fr; }
+  .left { padding:32px; display:flex; flex-direction:column; gap:20px; }
+  .brand { font-family:"Barlow Condensed"; font-weight:800; font-size:26px; }
+  nav { display:flex; gap:18px; color:#666; } nav b { color:var(--board); }
+  .pass { background:#fff; border-radius:14px; box-shadow:0 12px 30px rgba(0,0,0,.12); overflow:hidden; }
+  .pass .main { padding:22px; }
+  .pass h1 { font-family:"Barlow Condensed"; font-size:46px; line-height:.95; }
+  .seg { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:16px; }
+  .seg div { font-size:12px; color:var(--muted); } .seg b { display:block; color:var(--board); font-size:20px; font-variant-numeric:tabular-nums; }
+  .stub { border-top:2px dashed #ccc; padding:16px 22px; display:flex; justify-content:space-between; align-items:center; }
+  .btn { background:var(--board); color:#fff; padding:12px 18px; border-radius:8px; font-weight:600; opacity:.4; }
+  .desc { font-size:14px; color:#444; line-height:1.5; }
+  .board { background:var(--board); color:#eee; padding:28px 32px; }
+  .board h2 { font-family:"Barlow Condensed"; font-size:30px; color:var(--amber); margin-bottom:16px; }
+  table { width:100%; border-collapse:separate; border-spacing:0 6px; font-variant-numeric:tabular-nums; }
+  th { text-align:left; font-size:12px; color:#9a9a96; font-weight:600; padding:0 14px; }
+  td { background:var(--row); padding:12px 14px; font-size:17px; }
+  td:first-child { border-radius:6px 0 0 6px; } td:last-child { border-radius:0 6px 6px 0; }
+  .th { width:44px; height:56px; border-radius:3px; display:inline-block; vertical-align:middle; }
+  tr.lit td { background:#2a2410; color:var(--amber); box-shadow:inset 0 0 0 1px var(--amber); }
+  .st { font-weight:800; } .ok { color:#7bd88f; } .run { color:#fff; } .wait { color:var(--muted); } .bad { color:#ff6b5b; }
+</style>
+</head>
+<body>
+  <section class="left">
+    <div class="brand">Backdrop Studio</div>
+    <nav><b>New set</b><span>Products</span><span>Templates</span></nav>
+    <div class="pass">
+      <div class="main">
+        <h1>Satin Wrap Midi Dress</h1>
+        <div class="seg"><div>Template<b>Ama</b></div><div>Colours<b>3</b></div><div>Images<b>4/6</b></div></div>
+      </div>
+      <div class="stub"><span>Folder satin-wrap-midi-dress</span><span class="btn">Download .zip</span></div>
+    </div>
+    <p class="desc">A satin midi dress with a wrap front, V-neckline and flutter sleeves. The tie waist cinches the fit. Comes in Black, Wine Red and Emerald.</p>
+  </section>
+  <section class="board">
+    <h2>Images</h2>
+    <table>
+      <tr><th></th><th>Colour</th><th>Shot</th><th>Made from</th><th>State</th><th>Time</th></tr>
+      <tr class="lit"><td><span class="th" style="background:#6e1a2b"></span></td><td>Wine Red</td><td>Front</td><td>Your photo</td><td class="st">Just finished</td><td>1:12</td></tr>
+      <tr><td><span class="th" style="background:#1d1d1d"></span></td><td>Black</td><td>Front</td><td>Your photo</td><td class="st ok">Done</td><td>1:04</td></tr>
+      <tr><td><span class="th" style="background:#262626"></span></td><td>Black</td><td>Back</td><td>Your photo</td><td class="st ok">Done</td><td>0:58</td></tr>
+      <tr><td><span class="th" style="background:#1f6b4a"></span></td><td>Emerald</td><td>Front</td><td>Your photo</td><td class="st ok">Done</td><td>1:20</td></tr>
+      <tr><td><span class="th" style="background:#6e1a2b;opacity:.5"></span></td><td>Wine Red</td><td>Back</td><td>Black’s back design</td><td class="st run">Working</td><td>0:41</td></tr>
+      <tr><td><span class="th" style="background:#1f6b4a;opacity:.5"></span></td><td>Emerald</td><td>Back</td><td>Black’s back design</td><td class="st wait">Waiting</td><td>—</td></tr>
+    </table>
+  </section>
+</body>
+</html>

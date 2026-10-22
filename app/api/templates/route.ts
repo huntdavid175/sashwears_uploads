@@ -1,8 +1,6 @@
 import { connection } from "next/server"
 
-import { defined, errorResponse, readJson, templateInput } from "@/lib/api"
-import { getStoredImage } from "@/lib/imagekit"
-import { StoreError } from "@/lib/store/errors"
+import { defined, errorResponse, readJson, templateImages, templateInput } from "@/lib/api"
 import { createTemplate, listTemplates } from "@/lib/store/templates"
 
 export async function GET() {
@@ -14,15 +12,14 @@ export async function GET() {
   }
 }
 
-/** Template fields plus `referenceFileId` of a background the browser uploaded to ImageKit. */
+/**
+ * Template fields (`name`, `kind`: "model" | "scene", `prompt`, model settings) plus
+ * `shots: [{ name, fileId }]`, each a reference photo the browser uploaded to ImageKit.
+ */
 export async function POST(request: Request) {
   try {
     const body = await readJson(request)
-    if (typeof body.referenceFileId !== "string") {
-      throw new StoreError("invalid", "Reference image is required")
-    }
-    const reference = await getStoredImage(body.referenceFileId)
-    const template = await createTemplate(defined(templateInput(body)), reference)
+    const template = await createTemplate(defined(templateInput(body)), await templateImages(body))
     return Response.json(template, { status: 201 })
   } catch (err) {
     return errorResponse(err)

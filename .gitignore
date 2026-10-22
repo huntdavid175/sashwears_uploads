@@ -36,6 +36,14 @@ yarn-error.log*
 # vercel
 .vercel
 
+# impeccable: review screenshots, engine binary (re-downloaded on first run), caches,
+# decision-page logs, and catalog reference images copied from impeccable.style
+/.impeccable/review/
+/.impeccable/hook.cache.json
+/.impeccable/questions/
+/.impeccable/mocks/refs/
+/.claude/skills/impeccable/scripts/bin/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

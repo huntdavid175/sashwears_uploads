@@ -14,13 +14,12 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { SETTINGS_PAGE } from "@/lib/features"
 import { useTheme, type ThemePreference } from "@/lib/theme"
 
 const NAV = [
   { href: "/", label: "Upload" },
-  { href: "/dresses", label: "Dresses" },
-  ...(SETTINGS_PAGE ? [{ href: "/settings", label: "Settings" }] : []),
+  { href: "/products", label: "Products" },
+  { href: "/templates", label: "Templates" },
 ]
 
 const THEMES = [
@@ -37,38 +36,41 @@ export function AppHeader() {
 /** The header itself; `pathname: null` (the Suspense fallback) just highlights nothing. */
 export function AppHeaderShell({ pathname }: { pathname: string | null }) {
   return (
-    <header className="sticky top-0 z-10 border-b border-border bg-background">
-      <div className="flex h-14 items-center gap-2 px-4 sm:gap-4 md:px-8">
+    <header className="sticky top-0 z-10 border-b border-border bg-card">
+      <div className="mx-auto flex h-12 max-w-7xl items-center gap-3 px-4 md:px-6">
         <Link
           href="/"
-          className="font-condensed hidden shrink-0 text-lg font-semibold tracking-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:inline"
+          className="font-condensed shrink-0 text-xl leading-none font-extrabold tracking-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           Backdrop Studio
         </Link>
-        <nav aria-label="Sections" className="flex items-center gap-1">
-          {NAV.map((item) => {
-            const active =
-              pathname !== null &&
-              (item.href === "/" ? pathname === "/" : pathname.startsWith(item.href))
-            // The current section gets a cobalt rule along the header's bottom edge.
-            return (
-              <Button
-                key={item.href}
-                size="sm"
-                variant="ghost"
-                nativeButton={false}
-                render={<Link href={item.href} aria-current={active ? "page" : undefined} />}
-                className="relative aria-[current=page]:text-primary aria-[current=page]:after:absolute aria-[current=page]:after:inset-x-2.5 aria-[current=page]:after:-bottom-[18px] aria-[current=page]:after:h-0.5 aria-[current=page]:after:rounded-full aria-[current=page]:after:bg-primary"
-              >
-                {item.label}
-              </Button>
-            )
-          })}
-        </nav>
+        <span className="hidden text-xs text-muted-foreground sm:inline">
+          Product photos, shop-ready
+        </span>
         <div className="ml-auto">
           <ThemeMenu />
         </div>
       </div>
+      {/* Section tabs: the current one is red with a red rule along the header's edge. */}
+      <nav aria-label="Sections" className="mx-auto flex max-w-7xl px-2 md:px-4">
+        {NAV.map((item) => {
+          const active =
+            pathname !== null &&
+            (item.href === "/"
+              ? pathname === "/" || pathname.startsWith("/shoots")
+              : pathname.startsWith(item.href))
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+              className="relative px-3 py-2.5 text-sm font-medium text-foreground outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50 aria-[current=page]:font-bold aria-[current=page]:text-primary aria-[current=page]:after:absolute aria-[current=page]:after:inset-x-3 aria-[current=page]:after:-bottom-px aria-[current=page]:after:h-0.5 aria-[current=page]:after:bg-primary"
+            >
+              {item.label}
+            </Link>
+          )
+        })}
+      </nav>
     </header>
   )
 }

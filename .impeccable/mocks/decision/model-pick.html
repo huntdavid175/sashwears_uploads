@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Contact Sheet — review</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
+<style>
+  :root { --film:#141414; --paper:#f2f2ef; --grease:#d7262e; --amber:#e8a33d; --muted:#6a6a66; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { width:1440px; height:900px; overflow:hidden; font-family:Archivo, sans-serif; background:var(--paper); color:var(--film); }
+  header { height:64px; background:var(--film); color:#fff; display:flex; align-items:center; gap:36px; padding:0 36px; }
+  .brand { font-stretch:70%; font-weight:800; font-size:24px; }
+  header nav { display:flex; gap:24px; font-size:15px; color:#aaa; } header nav b { color:#fff; border-bottom:2px solid var(--grease); padding-bottom:4px; }
+  .wrap { display:grid; grid-template-columns:1fr 360px; gap:32px; padding:28px 36px; }
+  h1 { font-stretch:66%; font-weight:800; font-size:60px; line-height:.9; letter-spacing:-0.03em; }
+  .sub { color:var(--muted); margin:8px 0 22px; font-size:14px; }
+  .strip { background:var(--film); border-radius:4px; padding:22px 18px; margin-bottom:18px; position:relative; display:flex; gap:16px; align-items:center; }
+  .strip::before, .strip::after { content:""; position:absolute; left:10px; right:10px; height:8px; background:repeating-linear-gradient(90deg, #3a3a38 0 14px, transparent 14px 26px); border-radius:2px; }
+  .strip::before { top:7px; } .strip::after { bottom:7px; }
+  .label { width:120px; color:#fff; }
+  .label b { font-size:22px; font-stretch:75%; display:block; } .label span { color:#9a9a96; font-size:12px; }
+  .frame { position:relative; width:122px; height:150px; border-radius:2px; }
+  .frame em { position:absolute; left:4px; bottom:-18px; font:700 11px "Courier Prime", monospace; color:var(--amber); font-style:normal; }
+  .circle { position:absolute; inset:-9px -12px; border:3px solid var(--grease); border-radius:48% 52% 45% 55%; transform:rotate(-4deg); }
+  .arrow { color:#a5a5a0; font-size:28px; margin:0 4px; }
+  .made { width:122px; height:150px; border-radius:2px; background:#2a2a28; position:relative; }
+  .made i { position:absolute; inset:auto 8px 8px auto; width:46px; height:60px; border:2px solid #fff; border-radius:2px; }
+  .note { position:absolute; right:22px; top:50%; transform:translateY(-50%) rotate(-3deg); color:var(--grease); font:700 15px "Courier Prime", monospace; }
+  aside { background:#fff; border:1px solid #d9d9d4; border-radius:8px; padding:22px; display:flex; flex-direction:column; gap:14px; height:fit-content; }
+  aside label { font-size:13px; font-weight:700; } .field { border:1px solid #cfcfca; border-radius:6px; padding:10px 12px; font-size:15px; }
+  .desc { height:120px; color:#444; font-size:14px; line-height:1.45; }
+  .tot { border-top:1px solid #e3e3de; padding-top:14px; font-size:14px; color:var(--muted); }
+  .tot b { display:block; color:var(--film); font-size:18px; }
+  .btn { background:var(--grease); color:#fff; border-radius:6px; padding:13px; text-align:center; font-weight:700; }
+</style>
+</head>
+<body>
+  <header><div class="brand">Backdrop Studio</div><nav><b>New set</b><span>Products</span><span>Templates</span></nav></header>
+  <div class="wrap">
+    <section>
+      <h1>Satin Wrap Midi Dress</h1>
+      <p class="sub">Template: Ama, on a model · shots: Front, Back · the AI circled what each image is made from</p>
+      <div class="strip">
+        <div class="label"><b>Black</b><span>2 photos</span></div>
+        <div class="frame" style="background:#2b2b2b"><div class="circle"></div><em>12A front</em></div>
+        <div class="frame" style="background:#333"><div class="circle"></div><em>13A back</em></div>
+        <div class="arrow">→</div>
+        <div class="made"><i style="background:#1d1d1d"></i><em></em></div>
+        <div class="made"><i style="background:#262626"></i></div>
+      </div>
+      <div class="strip">
+        <div class="label"><b>Wine Red</b><span>1 photo</span></div>
+        <div class="frame" style="background:#6e1a2b"><div class="circle"></div><em>14A front</em></div>
+        <div class="frame" style="background:#1d1d1b;outline:2px dashed #a5a5a0;outline-offset:-2px"><em>13A borrowed</em></div>
+        <div class="arrow">→</div>
+        <div class="made"><i style="background:#6e1a2b"></i></div>
+        <div class="made"><i style="background:#6e1a2b"></i></div>
+        <div class="note">back: Black’s design</div>
+      </div>
+      <div class="strip">
+        <div class="label"><b>Emerald</b><span>2 photos</span></div>
+        <div class="frame" style="background:#1f6b4a"><div class="circle"></div><em>15A front</em></div>
+        <div class="frame" style="background:#245c43"><em>16A front</em></div>
+        <div class="arrow">→</div>
+        <div class="made"><i style="background:#1f6b4a"></i></div>
+        <div class="made"><i style="background:#1f6b4a"></i></div>
+      </div>
+    </section>
+    <aside>
+      <label>Name</label><div class="field">Satin Wrap Midi Dress</div>
+      <label>Description</label><div class="field desc">A satin midi dress with a wrap front, V-neckline and flutter sleeves. The tie waist cinches the fit. Comes in Black, Wine Red and Emerald.</div>
+      <div class="tot"><b>6 images</b>About US$1.32 of OpenAI credit</div>
+      <div class="btn">Generate 6 images</div>
+    </aside>
+  </div>
+</body>
+</html>

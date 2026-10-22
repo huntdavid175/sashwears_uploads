@@ -127,6 +127,39 @@ quantities) → save. No AI editing; the photos are moved into the dress's own I
 - [x] Push
 - [ ] **You:** upload one finished dress for real and check the AI's colour sorting
 
+## Phase 13 — On model sets
+Spec: replaces **Needs editing** on `/` with **On model**. Templates now hold the model's two poses (facing the
+camera, facing away; their setting is the scene) + instructions + model settings. The owner picks a template and
+drops any number of garment photos → the AI sorts them by colour and side and writes a name + description → she
+reviews (rename, move, front/back; sees what each image is made from and a cost estimate) → every colour gets a
+front **and** a back on the model. A colour with no back borrows another colour's back for the design (a side no
+colour has is guessed, with a warning). Files go to `/<root>/shoots/<handle>/` as `<name>-<colour>-<view>.<ext>`;
+the result page downloads one `.zip` (folder + `description.txt`). No list of past sets in the app.
+
+- [x] DB: `templates.model_front` / `model_back` (`reference` now optional), `shoots`, `shoot_images`, `jobs.shoot_image_id`
+- [x] `lib/shoot.ts` `planShoot`; `composeShootPrompt` + multi-image `editImages`; classify `describe`
+- [x] API: `POST /api/shoots`, `GET /api/shoots/[id]`, redo an image; templates take pose uploads
+- [x] UI: `/templates` (was hidden `/settings`), On model form → review → `/shoots/[id]` contact sheet + .zip
+- [x] Shared photo drop/sort components (Completed dress uses them too); `PRODUCT.md` for the impeccable skill
+- [x] Tests / lint / tsc / build; migration applied
+- [ ] **You:** add model photos to a template, run a real set, check the backs made from another colour
+
+## Phase 14 — Any product, template shots, Retail Mosaic redesign
+Spec: not just dresses — bags and more. A template is a **kind** (on a model: worn/held; product scene: the
+item alone) + its own **shots** (name + reference photo each, e.g. a bag's Front, Side, Back, Inside) +
+instructions. Sets make every colour × every shot; a missing shot borrows another colour's photo of it. The AI
+sorts photos into the template's shots and names any product type. "Dress" → "product" everywhere; sizes
+optional (one size); product type saved and exported to Shopify. Whole-app redesign through the impeccable
+skill: the owner chose **Retail Mosaic** (dense hairline modules, one utility red, side rails, the shot mosaic).
+
+- [x] DB: `templates.kind` / `shots` (poses migrated), `shoot_images.shot_name` / `shot_position`, `products.product_type`
+- [x] `planShoot` over template shots; kind-aware `composeShootPrompt`; classify into any shots + product type
+- [x] Optional sizes (`ONE_SIZE`), Shopify `Type` column and Color-only variants
+- [x] Templates API/UI: kind toggle, shot list editor (quick-add front/back/side/inside…)
+- [x] Redesign: tokens, header tabs, Upload rail, set review mosaic, results contact sheet, Products (type rail + search), product detail, templates
+- [x] `/dresses` → `/products`; tests (57) / lint / tsc / build; migration applied
+- [ ] **You:** make a bag template (scene or model) with its shots, run a real bag set
+
 ---
 
 ## Assumptions

@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+import type { Template } from "@/lib/types"
 import { storedImage, useTestDb } from "@/test/db"
 import { pngHeader } from "@/test/fixtures"
 
 const edit = vi.hoisted(() => ({
   fail: false,
   calls: [] as { size: string; view?: string }[],
+  /** Shoot edits: how many images went in, and the prompt. */
+  shootCalls: [] as { size: string; images: number; prompt: string }[],
 }))
 
 vi.mock("@/lib/openai/edit", async (importOriginal) => {
@@ -14,6 +17,11 @@ vi.mock("@/lib/openai/edit", async (importOriginal) => {
     ...real,
     editImage: async (opts: { size: string; view?: string }) => {
       edit.calls.push({ size: opts.size, view: opts.view })
+      if (edit.fail) throw new real.EditError("boom")
+      return pngHeader(1024, 1536)
+    },
+    editImages: async (opts: { size: string; images: Buffer[]; prompt: string }) => {
+      edit.shootCalls.push({ size: opts.size, images: opts.images.length, prompt: opts.prompt })
       if (edit.fail) throw new real.EditError("boom")
       return pngHeader(1024, 1536)
     },
@@ -79,7 +87,15 @@ vi.mock("@/lib/imagekit", async (importOriginal) => {
   }
 })
 
-const { createCompletedDress, regeneratePhoto, runNext, updateProduct } = await import("./queue")
+const {
+  createCompletedDress,
+  createShootFromPhotos,
+  regeneratePhoto,
+  regenerateShootImage,
+  runNext,
+  updateProduct,
+} = await import("./queue")
+const { getShoot } = await import("./store/shoots")
 const { createProduct, getProduct } = await import("./store/products")
 const { createTemplate, updateTemplate } = await import("./store/templates")
 
@@ -87,7 +103,7 @@ let db: Awaited<ReturnType<typeof useTestDb>>
 
 beforeEach(async () => {
   db = await useTestDb()
-  Object.assign(edit, { fail: false, calls: [] })
+  Object.assign(edit, { fail: false, calls: [], shootCalls: [] })
   Object.assign(naming, { name: "Satin Wrap Midi Dress", calls: 0 })
   Object.assign(ik, { uploads: [], renames: [], moves: [], deletes: [] })
 })
@@ -104,7 +120,7 @@ async function drain() {
 async function submitDress() {
   const template = await createTemplate(
     { name: "Studio", prompt: "p", model: "gpt-image-1.5" },
-    storedImage(),
+    { reference: storedImage() },
   )
   const photo = (view: "front" | "back") => ({
     view,
@@ -286,5 +302,156 @@ describe("completed dresses", () => {
     const wine = renamed.colors[1].photos[0]
     expect(wine.output?.filePath).toMatch(/satin-wrap-midi-dress-burgundy-front\.jpg$/)
     expect(wine.source).toEqual(wine.output)
+  })
+})
+
+describe("sets", () => {
+  const pose = () => storedImage(1024, 1536)
+
+  async function startShoot(existing?: Template) {
+    const template =
+      existing ??
+      (await createTemplate(
+        { name: "Ama", prompt: "soft studio light", model: "gpt-image-2" },
+        {
+          shots: [
+            { name: "Front", reference: pose() },
+            { name: "Back", reference: pose() },
+          ],
+        },
+      ))
+    const shoot = await createShootFromPhotos({
+      templateId: template.id,
+      name: "Satin Wrap Midi Dress",
+      description: "A wrap dress.",
+      colors: [
+        {
+          name: "Black",
+          photos: [
+            { view: "front", image: storedImage(800, 1200) },
+            { view: "back", image: storedImage(800, 1200) },
+          ],
+        },
+        { name: "Wine Red", photos: [{ view: "front", image: storedImage(800, 1200) }] },
+      ],
+    })
+    return { template, shoot }
+  }
+
+  it("puts every colour in every shot on the model, in the set's folder", async () => {
+    const { template, shoot } = await startShoot()
+    expect(template.kind).toBe("model")
+    expect(shoot.status).toBe("generating")
+    expect(shoot.colors.map((c) => c.images.map((i) => `${c.name} ${i.shotName}`))).toEqual([
+      ["Black Front", "Black Back"],
+      ["Wine Red Front", "Wine Red Back"],
+    ])
+    await drain()
+
+    const done = await getShoot(shoot.id)
+    expect(done.status).toBe("ready")
+    expect(edit.calls).toEqual([])
+    // Shot reference + product photos; Wine Red's back is its front + Black's back.
+    expect(edit.shootCalls.map((c) => c.images)).toEqual([2, 2, 2, 3])
+    expect(edit.shootCalls[3].prompt).toMatch(/Image 3 shows the Back view of the same product/)
+    expect(edit.shootCalls[1].prompt).toMatch(/"Back" shot/)
+    expect(edit.shootCalls[0].prompt).toMatch(/Image 1 is the MODEL/)
+    expect(edit.shootCalls.every((c) => c.size === "1024x1536")).toBe(true)
+    expect(ik.uploads.map((u) => `${u.folder}/${u.fileName}`)).toEqual([
+      "/backdrop-studio/shoots/satin-wrap-midi-dress/satin-wrap-midi-dress-black-front.png",
+      "/backdrop-studio/shoots/satin-wrap-midi-dress/satin-wrap-midi-dress-black-back.png",
+      "/backdrop-studio/shoots/satin-wrap-midi-dress/satin-wrap-midi-dress-wine-red-front.png",
+      "/backdrop-studio/shoots/satin-wrap-midi-dress/satin-wrap-midi-dress-wine-red-back.png",
+    ])
+    expect(done.colors[1].images[1].output?.filePath).toMatch(/wine-red-back\.png$/)
+
+    // A second set with the same name gets its own folder.
+    const { shoot: again } = await startShoot(template)
+    expect(again.handle).toBe("satin-wrap-midi-dress-2")
+  })
+
+  it("places a bag in a scene template's own shots", async () => {
+    const template = await createTemplate(
+      { name: "Marble table", kind: "scene", prompt: "morning light" },
+      {
+        shots: ["Front", "Side", "Inside"].map((name) => ({
+          name,
+          reference: storedImage(1536, 1024),
+        })),
+      },
+    )
+    expect(template.shots.map((s) => s.key)).toEqual(["front", "side", "inside"])
+    const shoot = await createShootFromPhotos({
+      templateId: template.id,
+      name: "Woven Raffia Tote Bag",
+      description: "",
+      colors: [
+        {
+          name: "Tan",
+          photos: [
+            { view: "front", image: storedImage() },
+            { view: "inside", image: storedImage() },
+          ],
+        },
+      ],
+    })
+    await drain()
+    expect((await getShoot(shoot.id)).status).toBe("ready")
+    expect(edit.shootCalls[0].prompt).toMatch(/Image 1 is the SCENE/)
+    expect(edit.shootCalls[0].prompt).toMatch(/Place this product in the scene/)
+    // No colour has a side photo: made from Tan's own photos, guessed.
+    expect(edit.shootCalls[1].images).toBe(3)
+    expect(edit.shootCalls[0].size).toBe("1536x1024")
+    expect(ik.uploads.map((u) => u.fileName)).toEqual([
+      "woven-raffia-tote-bag-tan-front.png",
+      "woven-raffia-tote-bag-tan-side.png",
+      "woven-raffia-tote-bag-tan-inside.png",
+    ])
+  })
+
+  it("redoes one image with the same photos and settings, replacing its file", async () => {
+    edit.fail = true
+    const { template, shoot } = await startShoot()
+    await drain()
+    expect((await getShoot(shoot.id)).status).toBe("attention")
+
+    edit.fail = false
+    // Later template edits don't change a set already made.
+    await updateTemplate(template.id, { outputFormat: "webp" })
+    const image = shoot.colors[0].images[0]
+    await regenerateShootImage(shoot.id, image.id)
+    await expect(regenerateShootImage(shoot.id, image.id)).rejects.toThrow(/already/)
+    await drain()
+    const redone = await getShoot(shoot.id)
+    expect(redone.colors[0].images[0]).toMatchObject({ status: "done" })
+    expect(redone.status).toBe("attention")
+    expect(ik.uploads.at(-1)?.fileName).toBe("satin-wrap-midi-dress-black-front.png")
+  })
+
+  it("needs a template with shots; shot names must be unique", async () => {
+    const background = await createTemplate(
+      { name: "Beach", prompt: "p" },
+      { reference: storedImage() },
+    )
+    await expect(
+      createShootFromPhotos({
+        templateId: background.id,
+        name: "Dress",
+        description: "",
+        colors: [{ name: "Black", photos: [{ view: "front", image: storedImage() }] }],
+      }),
+    ).rejects.toThrow(/Add the shots/)
+    await expect(createTemplate({ name: "Empty", prompt: "p" }, {})).rejects.toThrow(/shot/)
+    await expect(
+      createTemplate(
+        { name: "Twice", prompt: "p" },
+        {
+          shots: [
+            { name: "Front", reference: pose() },
+            { name: "front ", reference: pose() },
+          ],
+        },
+      ),
+    ).rejects.toThrow(/twice/)
   })
 })

@@ -8,16 +8,19 @@ import {
   relocateImage,
   toUploadError,
 } from "@/lib/imagekit"
-import { editImage, toEditError } from "@/lib/openai/edit"
+import { composeShootPrompt, editImage, editImages, toEditError } from "@/lib/openai/edit"
 import { cleanName, nameProduct } from "@/lib/openai/name"
+import { planShoot } from "@/lib/shoot"
 import { pickSize } from "@/lib/size"
 import { StoreError } from "@/lib/store/errors"
 import {
   addJobs,
+  againJob,
   claimNextJob,
   failStaleJobs,
   finishJob,
   hasQueuedJobs,
+  latestShootJob,
   newJob,
 } from "@/lib/store/jobs"
 import {
@@ -31,8 +34,24 @@ import {
   saveProduct,
   setPhotoOutput,
 } from "@/lib/store/products"
+import {
+  createShoot,
+  freeShootHandle,
+  getShoot,
+  getShootImageContext,
+  setShootImageOutput,
+} from "@/lib/store/shoots"
 import { getDefaultTemplate, getTemplate, slugify } from "@/lib/store/templates"
-import type { Job, PhotoView, Product, ProductColor, ProductPhoto, StoredImage } from "@/lib/types"
+import {
+  isReady,
+  type Job,
+  type PhotoView,
+  type Product,
+  type ProductColor,
+  type ProductPhoto,
+  type Shoot,
+  type StoredImage,
+} from "@/lib/types"
 
 /**
  * How jobs run on Vercel: there is no long-lived process, so each job runs in its own
@@ -46,6 +65,11 @@ export const CONCURRENCY = 2
 /** Each dress has its own folder on ImageKit, named after it. */
 export function dressFolder(handle: string) {
   return imagekitFolder(`dresses/${handle}`)
+}
+
+/** So does each shoot. */
+export function shootFolder(handle: string) {
+  return imagekitFolder(`shoots/${handle}`)
 }
 
 export { hasQueuedJobs }
@@ -73,7 +97,9 @@ export function photoFileName(
 async function runJob(job: Job) {
   const { templateSnapshot: snap } = job
   try {
+    if (job.shootImageId) return await runShootJob(job, job.shootImageId)
     if (!job.photoId) throw new Error("This job isn't linked to a dress photo")
+    if (!snap.reference) throw new Error("This template has no background photo")
     const { product, photo } = await getPhotoContext(job.photoId)
     const [source, reference] = await Promise.all([
       downloadImage(job.source),
@@ -111,6 +137,45 @@ async function runJob(job: Job) {
   }
 }
 
+/** Make one colour's image for one of the template's shots and file it in the set's folder. */
+async function runShootJob(job: Job, imageId: string) {
+  const { templateSnapshot: snap } = job
+  const { shoot, image } = await getShootImageContext(imageId)
+  const reference = snap.shots?.find((s) => s.key === image.view)?.reference
+  if (!reference) throw new Error(`The template has no "${image.shotName}" shot any more`)
+  const images = await Promise.all(
+    [reference, ...image.inputs.map((i) => i.image)].map(downloadImage),
+  )
+  const size = pickSize(snap.model, reference.width, reference.height)
+  const data = await editImages({
+    settings: snap,
+    images,
+    prompt: composeShootPrompt(snap.prompt, {
+      kind: snap.kind ?? "model",
+      shot: image.shotName,
+      inputs: image.inputs,
+    }),
+    size,
+  })
+
+  const ext = snap.outputFormat === "jpeg" ? "jpg" : snap.outputFormat
+  const fileName = `${shoot.handle}-${slugify(image.color, "colour")}-${image.view}.${ext}`
+  let uploaded
+  try {
+    uploaded = await putImage({
+      data,
+      folder: shootFolder(shoot.handle),
+      fileName,
+      previous: image.output,
+    })
+  } catch (err) {
+    if (err instanceof ReplacedError) await setShootImageOutput(imageId, null)
+    throw err
+  }
+  await setShootImageOutput(imageId, uploaded)
+  await finishJob(job.id, { status: "done", size })
+}
+
 /** Name the dress from its first colour's front photo (reusing this job's bytes if it's that one). */
 async function nameFromCover(product: Product, job: Job, source: Buffer) {
   const cover = product.colors[0]?.photos.find((p) => p.view === "front")
@@ -139,6 +204,7 @@ export async function regeneratePhoto(productId: string, photoId: string): Promi
 
 export type ProductPatch = {
   name?: string
+  productType?: string
   price?: number
   sizes?: string[]
   colors?: { id: string; name: string; quantities: Record<string, number> }[]
@@ -197,6 +263,7 @@ async function syncFileNames(product: Product) {
 
 export type CompletedDressInput = {
   name: string
+  productType?: string
   price: number
   sizes: string[]
   note?: string
@@ -234,4 +301,46 @@ export async function createCompletedDress(input: CompletedDressInput): Promise<
     })),
   )
   return createCompletedProduct({ ...input, handle, colors })
+}
+
+export type ShootInput = {
+  templateId: string
+  name: string
+  description: string
+  colors: { name: string; photos: { view: PhotoView; image: StoredImage }[] }[]
+}
+
+/**
+ * Plan every colour × every shot of the template from the sorted photos, save, and queue the
+ * edits. Photos sorted into a shot the template doesn't have still lend colour and material.
+ */
+export async function createShootFromPhotos(input: ShootInput): Promise<Shoot> {
+  const template = await getTemplate(input.templateId)
+  if (!isReady(template)) {
+    throw new StoreError("invalid", `Add the shots and their photos to "${template.name}" first`)
+  }
+  const handle = await freeShootHandle(input.name)
+  return createShoot(
+    {
+      name: input.name,
+      handle,
+      description: input.description,
+      images: planShoot(input.colors, template.shots),
+    },
+    template,
+  )
+}
+
+/** Make one shoot image again, from the same photos and template settings as before. */
+export async function regenerateShootImage(shootId: string, imageId: string): Promise<Shoot> {
+  const shoot = await getShoot(shootId)
+  const image = shoot.colors.flatMap((c) => c.images).find((i) => i.id === imageId)
+  if (!image) throw new StoreError("not_found", "Image not found")
+  if (image.status === "queued" || image.status === "processing") {
+    throw new StoreError("invalid", "This image is already being generated")
+  }
+  const last = await latestShootJob(imageId)
+  if (!last) throw new StoreError("invalid", "This image has no earlier run to repeat")
+  await addJobs([againJob(last)])
+  return getShoot(shootId)
 }

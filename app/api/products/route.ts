@@ -5,12 +5,14 @@ import {
   MAX_COLORS,
   MAX_COMPLETED_PHOTOS,
   normalizeColorName,
+  normalizeProductType,
   normalizeQuantities,
   normalizeSizes,
   parsePrice,
 } from "@/lib/dress"
 import { getStoredImage } from "@/lib/imagekit"
 import { cleanName } from "@/lib/openai/name"
+import { DEFAULT_SHOTS } from "@/lib/shoot"
 import { CONCURRENCY, createCompletedDress, hasQueuedJobs } from "@/lib/queue"
 import { StoreError } from "@/lib/store/errors"
 import { failStaleJobs } from "@/lib/store/jobs"
@@ -119,8 +121,9 @@ type CompletedColorInput = {
 }
 
 /**
- * A finished dress: `{ kind: "completed", name, price, sizes, note?, colors: [{ name, quantities,
- * photos: [{ fileId, view }] }] }`. Each colour needs exactly one front and at most one back.
+ * A finished product: `{ kind: "completed", name, productType?, price, sizes (may be empty),
+ * note?, colors: [{ name, quantities, photos: [{ fileId, view }] }] }`. `view` is one of
+ * DEFAULT_SHOTS; each colour needs at least one photo and at most one per shot.
  */
 async function parseCompletedDress(body: Record<string, unknown>) {
   const invalid = <T>(fn: () => T): T => {
@@ -131,7 +134,8 @@ async function parseCompletedDress(body: Record<string, unknown>) {
     }
   }
   const name = typeof body.name === "string" ? cleanName(body.name) : ""
-  if (!name) throw new StoreError("invalid", "Give the dress a name")
+  if (!name) throw new StoreError("invalid", "Give the product a name")
+  const productType = normalizeProductType(body.productType) || undefined
   const price = invalid(() => parsePrice(body.price))
   const sizes = invalid(() => normalizeSizes(body.sizes))
   const note =
@@ -149,29 +153,33 @@ async function parseCompletedDress(body: Record<string, unknown>) {
     (Array.isArray(c.photos) ? c.photos : []).map((p) => p?.fileId),
   )
   if (fileIds.length > MAX_COMPLETED_PHOTOS) {
-    throw new StoreError("invalid", `Up to ${MAX_COMPLETED_PHOTOS} photos per dress`)
+    throw new StoreError("invalid", `Up to ${MAX_COMPLETED_PHOTOS} photos per product`)
   }
   if (new Set(fileIds).size !== fileIds.length) {
     throw new StoreError("invalid", "A photo is listed twice")
   }
 
+  const shotKeys = DEFAULT_SHOTS.map((s) => s.key)
   return {
     name,
+    productType,
     price,
     sizes,
     note,
     colors: await Promise.all(
       colors.map(async (c, i) => {
-        const photos = Array.isArray(c.photos) ? c.photos : []
+        // In shot order, so every colour reads front, back, side…
+        const photos = (Array.isArray(c.photos) ? c.photos : []).toSorted(
+          (a, b) => shotKeys.indexOf(String(a?.view)) - shotKeys.indexOf(String(b?.view)),
+        )
         const views = photos.map((p) => p?.view)
-        if (views.filter((v) => v === "front").length !== 1) {
-          throw new StoreError("invalid", `${names[i]} needs exactly one front photo`)
+        if (!photos.length) throw new StoreError("invalid", `${names[i]} has no photos`)
+        if (views.some((v) => !shotKeys.includes(String(v)))) {
+          throw new StoreError("invalid", `Each photo must be one of: ${shotKeys.join(", ")}`)
         }
-        if (views.filter((v) => v === "back").length > 1) {
-          throw new StoreError("invalid", `${names[i]} has more than one back photo`)
-        }
-        if (views.some((v) => v !== "front" && v !== "back")) {
-          throw new StoreError("invalid", "Each photo must be a front or a back")
+        const repeat = views.find((v, j) => views.indexOf(v) !== j)
+        if (repeat) {
+          throw new StoreError("invalid", `${names[i]} has more than one ${repeat} photo`)
         }
         return {
           name: names[i],
@@ -179,7 +187,7 @@ async function parseCompletedDress(body: Record<string, unknown>) {
           photos: await Promise.all(
             photos.map(async (p) => {
               if (typeof p.fileId !== "string") throw new StoreError("invalid", "Missing fileId")
-              return { view: p.view as "front" | "back", image: await getStoredImage(p.fileId) }
+              return { view: String(p.view), image: await getStoredImage(p.fileId) }
             }),
           ),
         }

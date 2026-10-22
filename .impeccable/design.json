@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-22T00:00:00Z",
+  "title": "Design System: Backdrop Studio",
+  "extensions": {
+    "colorMeta": {
+      "utility-red": { "role": "primary", "displayName": "Utility Red", "canonical": "#e60012", "tonalRamp": ["oklch(25% 0.1 27)", "oklch(35% 0.14 27)", "oklch(45% 0.18 27)", "oklch(58% 0.235 27)", "oklch(66% 0.2 25)", "oklch(75% 0.14 22)", "oklch(85% 0.08 20)", "oklch(95% 0.025 20)"] },
+      "utility-red-lifted": { "role": "primary", "displayName": "Utility Red (dark theme)", "canonical": "#ff3b46", "tonalRamp": ["oklch(25% 0.1 24)", "oklch(35% 0.14 24)", "oklch(48% 0.19 24)", "oklch(64% 0.23 24)", "oklch(70% 0.19 22)", "oklch(78% 0.13 20)", "oklch(87% 0.07 18)", "oklch(95% 0.025 18)"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#111111", "tonalRamp": ["#111111", "#2e2e2e", "#4a4a4a", "#5c5c5c", "#8a8a8a", "#bdbdbd", "#e0e0e0", "#f5f5f5"] },
+      "canvas-grey": { "role": "neutral", "displayName": "Canvas Grey", "canonical": "#f2f2f2" },
+      "module-white": { "role": "neutral", "displayName": "Module White", "canonical": "#ffffff" },
+      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "#e0e0e0" },
+      "hairline-strong": { "role": "neutral", "displayName": "Hairline Strong", "canonical": "#d6d6d6" },
+      "fill-grey": { "role": "neutral", "displayName": "Fill Grey", "canonical": "#f5f5f5" },
+      "hover-grey": { "role": "neutral", "displayName": "Hover Grey", "canonical": "#ececec" },
+      "quiet-ink": { "role": "neutral", "displayName": "Quiet Ink", "canonical": "#5c5c5c" },
+      "night-canvas": { "role": "neutral", "displayName": "Night Canvas", "canonical": "#0f0f0f" },
+      "night-module": { "role": "neutral", "displayName": "Night Module", "canonical": "#1a1a1a" },
+      "night-ink": { "role": "neutral", "displayName": "Night Ink", "canonical": "#f2f2f2" },
+      "night-hairline": { "role": "neutral", "displayName": "Night Hairline", "canonical": "#2e2e2e" },
+      "night-hairline-strong": { "role": "neutral", "displayName": "Night Hairline Strong", "canonical": "#3a3a3a" },
+      "night-fill": { "role": "neutral", "displayName": "Night Fill", "canonical": "#232323" },
+      "night-quiet-ink": { "role": "neutral", "displayName": "Night Quiet Ink", "canonical": "#a8a8a8" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display (condensed)", "purpose": "Page titles; same voice for the wordmark (20px) and template names (18px bold)." },
+      "figure": { "displayName": "Figure", "purpose": "The one headline number on a decision: the estimated cost beside Generate, in red." },
+      "title": { "displayName": "Title", "purpose": "Module title bars, product names, tile shot names (14px)." },
+      "body": { "displayName": "Body", "purpose": "All running text and data at 14px with tabular figures." },
+      "label": { "displayName": "Label", "purpose": "Tags (semibold); regular weight for source lines, legends and meta." }
+    },
+    "shadows": [
+      { "name": "floating-bar", "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)", "purpose": "Sticky phone action bar over scrolling content only." },
+      { "name": "inset-photo", "value": "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1), 0 0 0 2px var(--card)", "purpose": "Owner's source photo inset over the faded reference in a review tile." }
+    ],
+    "motion": [
+      { "name": "state", "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Tailwind default transition on buttons, toggles, tags and inputs; collapsed to 0.01ms under prefers-reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "phone-check", "value": "500px" },
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" },
+      { "name": "frame", "value": "80rem" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one red action per decision: Generate, Save, New template.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14\"/><path d=\"M12 5v14\"/></svg>Generate 12 images</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid transparent; border-radius: var(--radius); background: var(--primary); color: var(--primary-foreground); font: 500 14px/1 var(--font-archivo), sans-serif; cursor: pointer; transition: all 150ms; } .ds-btn-primary:hover { background: color-mix(in oklab, var(--primary) 80%, transparent); } .ds-btn-primary:focus-visible { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent); } .ds-btn-primary:active { transform: translateY(1px); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary actions: Edit, Add shots, Upload more.",
+      "html": "<button class=\"ds-btn-outline\">Add shots</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--background); color: var(--foreground); font: 500 14px/1 var(--font-archivo), sans-serif; cursor: pointer; transition: all 150ms; } .ds-btn-outline:hover { background: var(--muted); } .ds-btn-outline:focus-visible { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent); }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Quiet in-module actions: Fix sorting, Back, Retry, Download.",
+      "html": "<button class=\"ds-btn-ghost\">Fix sorting</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border: 1px solid transparent; border-radius: var(--radius); background: transparent; color: var(--foreground); font: 500 12.8px/1 var(--font-archivo), sans-serif; cursor: pointer; transition: all 150ms; } .ds-btn-ghost:hover { background: var(--muted); } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Hairline field; red stroke and ring on focus.",
+      "html": "<input class=\"ds-input\" value=\"Woven Raffia Tote Bag\" />",
+      "css": ".ds-input { height: 32px; width: 260px; padding: 4px 10px; border: 1px solid var(--input); border-radius: var(--radius); background: transparent; color: var(--foreground); font: 400 14px/1.4 var(--font-archivo), sans-serif; transition: border-color 150ms, box-shadow 150ms; } .ds-input:focus-visible { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent); }"
+    },
+    {
+      "name": "Section Tabs",
+      "kind": "nav",
+      "refersTo": "nav-tab-active",
+      "description": "Header tab row; the current section is bold red with a 2px red underline on the header hairline.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-tab\" href=\"#\" aria-current=\"page\">Upload</a><a class=\"ds-nav-tab\" href=\"#\">Products</a><a class=\"ds-nav-tab\" href=\"#\">Templates</a></nav>",
+      "css": ".ds-nav { display: flex; background: var(--card); border-bottom: 1px solid var(--border); padding: 0 8px; } .ds-nav-tab { position: relative; padding: 10px 12px; color: var(--foreground); font: 500 14px/1.4 var(--font-archivo), sans-serif; text-decoration: none; } .ds-nav-tab:hover { color: var(--primary); } .ds-nav-tab:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent); } .ds-nav-tab[aria-current=page] { color: var(--primary); font-weight: 700; } .ds-nav-tab[aria-current=page]::after { content: \"\"; position: absolute; left: 12px; right: 12px; bottom: -1px; height: 2px; background: var(--primary); }"
+    },
+    {
+      "name": "Tags",
+      "kind": "chip",
+      "refersTo": "tag-ink",
+      "description": "Rectangular provenance/state tags: ink = yours/done, red = borrowed/failed, red outline = guess/attention, grey outline = waiting/meta.",
+      "html": "<span class=\"ds-tag ds-tag-ink\">Photo</span> <span class=\"ds-tag ds-tag-red\">Borrowed</span> <span class=\"ds-tag ds-tag-alert\">Guess</span> <span class=\"ds-tag ds-tag-outline\">Waiting 3</span>",
+      "css": ".ds-tag { display: inline-flex; align-items: center; height: 20px; padding: 2px 6px; border: 1px solid transparent; border-radius: calc(var(--radius) * 0.6); font: 600 12px/1 var(--font-archivo), sans-serif; white-space: nowrap; } .ds-tag-ink { background: var(--foreground); color: var(--background); } .ds-tag-red { background: var(--primary); color: var(--primary-foreground); } .ds-tag-alert { border-color: var(--primary); background: var(--card); color: var(--primary); } .ds-tag-outline { border-color: var(--border); background: var(--card); color: var(--foreground); }"
+    },
+    {
+      "name": "Module",
+      "kind": "card",
+      "refersTo": "module",
+      "description": "The unit everything tiles from: a hairline-ruled white box with a bold title bar.",
+      "html": "<section class=\"ds-module\"><header class=\"ds-module-head\"><span class=\"ds-module-title\">Colours</span></header><ul class=\"ds-module-list\"><li><span>Tan</span><b>3</b></li><li><span>Black</span><b>2</b></li><li><span>Olive</span><b>1</b></li></ul></section>",
+      "css": ".ds-module { width: 192px; background: var(--card); color: var(--card-foreground); border-radius: var(--radius); box-shadow: 0 0 0 1px var(--border); overflow: hidden; font: 400 14px/1.43 var(--font-archivo), sans-serif; font-variant-numeric: tabular-nums; } .ds-module-head { padding: 8px 12px; border-bottom: 1px solid var(--border); } .ds-module-title { font-weight: 700; } .ds-module-list { list-style: none; margin: 0; padding: 0; } .ds-module-list li { display: flex; justify-content: space-between; padding: 6px 12px; border-bottom: 1px solid var(--border); } .ds-module-list b { color: var(--primary); }"
+    },
+    {
+      "name": "Shot Tile",
+      "kind": "custom",
+      "refersTo": "module",
+      "description": "Signature mosaic tile: faded shot reference, the owner's photo inset, a provenance tag, and a ruled caption.",
+      "html": "<div class=\"ds-shot\"><div class=\"ds-shot-img\"><span class=\"ds-shot-ref\"></span><span class=\"ds-shot-inset\"></span><span class=\"ds-shot-tag\">Borrowed</span></div><div class=\"ds-shot-cap\"><b>Back</b><span>Design from Black</span></div></div>",
+      "css": ".ds-shot { width: 168px; border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.6); overflow: hidden; background: var(--card); font-family: var(--font-archivo), sans-serif; } .ds-shot-img { position: relative; aspect-ratio: 4 / 5; background: var(--muted); } .ds-shot-ref { position: absolute; inset: 0; background: linear-gradient(160deg, #c98a74, #e8c2b0); opacity: 0.4; } .ds-shot-inset { position: absolute; right: 8px; bottom: 8px; width: 50%; aspect-ratio: 3 / 4; border-radius: 2px; background: #6b7d5a; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 0 0 2px var(--card); } .ds-shot-tag { position: absolute; top: 6px; left: 6px; height: 20px; padding: 2px 6px; box-sizing: border-box; border-radius: calc(var(--radius) * 0.6); background: var(--primary); color: var(--primary-foreground); font: 600 12px/16px inherit; } .ds-shot-cap { display: flex; flex-direction: column; padding: 6px 8px; border-top: 1px solid var(--border); font-size: 12px; } .ds-shot-cap b { font-size: 14px; } .ds-shot-cap span { color: var(--muted-foreground); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Retail Mosaic",
+    "overview": "Backdrop Studio is a working floor, not a showroom. Every colour, shot, cost and state is tiled onto one screen as white modules ruled with hairlines on a light-grey canvas, the way a dense Japanese retail catalogue packs a page. The owner should read the whole job at a glance: what each image is made from, what it costs, and what is done.\n\nThe system is compact and literal. Body type is small (14px) with tight leading, figures are tabular, and modules carry a bold title bar ruled off from their content. One utility red does all the pointing: the current tab, the one action that spends money, prices and costs, and anything that needs attention. Everything else is ink and greys. Depth comes from hairlines and the canvas/module contrast, not shadows.\n\nSmall rectangular tags are the system's vocabulary for provenance and state. They sit in the corner of image tiles and in title bars, and their fill (ink, red, red outline, grey outline) carries meaning consistently across review, results, products and templates. Dark mode is the same mosaic after hours: an ink canvas, lifted near-black modules, hairlines that still read, and a lifted red.",
+    "keyCharacteristics": [
+      "White hairline-ruled modules tiled on a light-grey canvas; wide (max 80rem) so rails and mosaics sit side by side.",
+      "One utility red for tabs, the primary action, prices/costs and attention; never decorative.",
+      "Archivo throughout: heavy condensed display for wordmark, page titles and template names; compact 14px body; tabular figures everywhere.",
+      "Tight radii (2-4px) and 1px rules; flat at rest.",
+      "Rectangular tags whose fill encodes provenance and state."
+    ],
+    "rules": [
+      { "name": "The One Red Rule", "body": "Red marks where you are, what spends money, what things cost, and what needs you. If an element is none of those, it is ink or grey.", "section": "colors" },
+      { "name": "The Semantic Token Rule", "body": "Use the semantic tokens from `app/globals.css` (`--primary`, `--card`, `--border`, `--muted-foreground`, ...). Never raw colour values or `dark:` overrides in app code; the `.dark` block carries the theme.", "section": "colors" },
+      { "name": "The Condensed Voice Rule", "body": "Condensed heavy Archivo is for the wordmark, page titles and template names. Body, buttons, tags and figures stay at normal width.", "section": "typography" },
+      { "name": "The Tabular Rule", "body": "Figures are tabular everywhere (`font-variant-numeric: tabular-nums` on `html`); do not switch it off for prices or counts.", "section": "typography" },
+      { "name": "The Flat Module Rule", "body": "A module at rest is a hairline box, never a shadowed card. If something casts a shadow, it is overlapping other content.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do build every surface from hairline-ruled module-white modules on the canvas grey, with bold title bars ruled off by a hairline.",
+      "Do keep red to the current tab, the one primary action, prices/costs, pressed selections and attention states.",
+      "Do use the tag fills consistently: ink = yours / done, red = borrowed / failed / default, red outline = guess / needs attention, grey outline = waiting / meta.",
+      "Do keep radii at 4px for modules and controls and 2.4px for tiles and tags.",
+      "Do keep white text on red at 4.5:1 or better in both themes.",
+      "Do keep page and rail content inside the 80rem frame and check phones at 500px wide."
+    ],
+    "donts": [
+      "Don't add a second accent hue, gradients, or decorative red.",
+      "Don't put shadows on modules at rest; shadows are only for content that floats over other content.",
+      "Don't use condensed Archivo for body, buttons, tags or numbers.",
+      "Don't use raw colour values or `dark:` overrides in app components; theme through the `.dark` tokens.",
+      "Don't use large or pill radii; this world is near-square."
+    ]
+  }
+}

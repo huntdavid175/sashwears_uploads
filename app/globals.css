@@ -48,90 +48,93 @@
 }
 
 :root {
-  /* Grey-card studio: a neutral 18%-grey-family canvas so garment colors are judged
-     against a neutral surround; white panels hold the images; one cobalt accent. */
-  --studio-grey: #d9d9d6;
-  --panel: #ffffff;
-  --ink: #1a1d21;
-  --cobalt: #1f4fd8;
-  --rule: #c4c4c0;
-  --soft: #ececea;
+  /* Retail mosaic: white modules ruled with hairlines on a light-grey canvas, dense ink text,
+     one utility red for tabs, primary actions, prices and attention. Tight radii. */
+  --canvas: #f2f2f2;
+  --module: #ffffff;
+  --ink: #111111;
+  --red: #e60012;
+  --rule: #e0e0e0;
+  --rule-strong: #d6d6d6;
+  --fill: #f5f5f5;
 
-  --background: var(--studio-grey);
+  --background: var(--canvas);
   --foreground: var(--ink);
-  --card: var(--panel);
+  --card: var(--module);
   --card-foreground: var(--ink);
-  --popover: var(--panel);
+  --popover: var(--module);
   --popover-foreground: var(--ink);
-  --primary: var(--cobalt);
+  --primary: var(--red);
   --primary-foreground: #ffffff;
-  --secondary: var(--soft);
+  --secondary: var(--fill);
   --secondary-foreground: var(--ink);
-  --muted: var(--soft);
-  --muted-foreground: #565a60;
-  --accent: #e4e4e1;
+  --muted: var(--fill);
+  --muted-foreground: #5c5c5c;
+  --accent: #ececec;
   --accent-foreground: var(--ink);
-  --destructive: oklch(0.577 0.245 27.325);
+  --destructive: var(--red);
   --border: var(--rule);
-  --input: var(--rule);
-  --ring: var(--cobalt);
+  --input: var(--rule-strong);
+  --ring: var(--red);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.5rem;
-  --sidebar: var(--studio-grey);
+  --radius: 0.25rem;
+  --sidebar: var(--module);
   --sidebar-foreground: var(--ink);
-  --sidebar-primary: var(--cobalt);
+  --sidebar-primary: var(--red);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: var(--panel);
+  --sidebar-accent: var(--fill);
   --sidebar-accent-foreground: var(--ink);
   --sidebar-border: var(--rule);
-  --sidebar-ring: var(--cobalt);
+  --sidebar-ring: var(--red);
 }
 
 .dark {
-  /* Same studio idea after dark: a deep neutral grey canvas (not black) so garment colors
-     still read true, slightly lifted panels, and a lighter cobalt that holds contrast. */
-  --studio-grey: #1c1d1f;
-  --panel: #26282b;
-  --ink: #ececea;
-  --cobalt: #7b9cff;
-  --rule: #3a3c40;
-  --soft: #303236;
+  /* The same mosaic after dark: an ink canvas, lifted near-black modules, hairlines that
+     still read, and the red lifted so tabs and prices hold contrast. */
+  --canvas: #0f0f0f;
+  --module: #1a1a1a;
+  --ink: #f2f2f2;
+  --red: #ff3b46;
+  --rule: #2e2e2e;
+  --rule-strong: #3a3a3a;
+  --fill: #232323;
 
-  --background: var(--studio-grey);
+  --background: var(--canvas);
   --foreground: var(--ink);
-  --card: var(--panel);
+  --card: var(--module);
   --card-foreground: var(--ink);
-  --popover: var(--panel);
+  --popover: var(--module);
   --popover-foreground: var(--ink);
-  --primary: var(--cobalt);
-  --primary-foreground: #0b1226;
-  --secondary: var(--soft);
+  --primary: var(--red);
+  /* Ink on the lifted red: white on #ff3b46 is ~3.5:1, ink is ~5.3:1. */
+  --primary-foreground: #111111;
+  --secondary: var(--fill);
   --secondary-foreground: var(--ink);
-  --muted: var(--soft);
-  --muted-foreground: #a4a7ac;
-  --accent: #34363a;
+  --muted: var(--fill);
+  --muted-foreground: #a8a8a8;
+  --accent: #262626;
   --accent-foreground: var(--ink);
-  --destructive: oklch(0.704 0.191 22.216);
+  --destructive: var(--red);
   --border: var(--rule);
-  --input: #45474c;
-  --ring: var(--cobalt);
+  --input: var(--rule-strong);
+  --ring: var(--red);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: var(--studio-grey);
+  --sidebar: var(--module);
   --sidebar-foreground: var(--ink);
-  --sidebar-primary: var(--cobalt);
-  --sidebar-primary-foreground: #0b1226;
-  --sidebar-accent: var(--panel);
+  --sidebar-primary: var(--red);
+  --sidebar-primary-foreground: #111111;
+  --sidebar-accent: var(--fill);
   --sidebar-accent-foreground: var(--ink);
   --sidebar-border: var(--rule);
-  --sidebar-ring: var(--cobalt);
+  --sidebar-ring: var(--red);
 }
 
 @layer base {
@@ -140,14 +143,32 @@
   }
   body {
     @apply bg-background text-foreground;
+    caret-color: var(--red);
+    accent-color: var(--red);
   }
   html {
     @apply font-sans;
+    font-variant-numeric: tabular-nums;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--red) 22%, transparent);
+  }
+  * {
+    scrollbar-color: var(--rule-strong) transparent;
+    scrollbar-width: thin;
   }
 }
-/* Archivo's width axis. Condensed is reserved for template names. */
+/* Archivo's width axis: heavy condensed display for page and product titles. */
 @utility font-condensed {
   font-stretch: 72%;
+}
+
+/* A module: white box ruled with a hairline, the unit everything is tiled from. */
+@utility module {
+  background-color: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
 @media (prefers-reduced-motion: reduce) {

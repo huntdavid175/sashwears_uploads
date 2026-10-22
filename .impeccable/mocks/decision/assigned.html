@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Swing Tag — review</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#1d1b18; --kraft:#cfae84; --kraft-deep:#b8946a; --ground:#d9c4a3; --tag:#f7f3ec; --stamp:#c8321e; --ready:#2f6b4f; --muted:#4f4538; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { width:1440px; height:900px; overflow:hidden; font-family:Archivo, sans-serif; color:var(--ink); background:var(--ground); display:grid; grid-template-columns:232px 1fr; }
+  .rail { background:var(--ink); color:var(--tag); padding:28px 22px; display:flex; flex-direction:column; gap:28px; }
+  .brand { font-stretch:70%; font-weight:800; font-size:26px; letter-spacing:-0.02em; }
+  .nav a { display:flex; justify-content:space-between; padding:10px 12px; border-radius:6px; color:#d8cfc2; text-decoration:none; font-size:15px; }
+  .nav a.on { background:#2e2a25; color:#fff; box-shadow:inset 3px 0 0 var(--kraft); }
+  .nav small { color:#8f8577; }
+  main { padding:28px 40px 0; position:relative; }
+  .head { display:flex; justify-content:space-between; align-items:flex-end; }
+  .eyebrowless { display:flex; gap:10px; align-items:center; color:var(--muted); font-size:14px; margin-top:8px; }
+  h1 { font-stretch:68%; font-weight:800; font-size:64px; line-height:.9; letter-spacing:-0.03em; }
+  .chip { background:var(--tag); border:1px solid var(--kraft-deep); border-radius:999px; padding:4px 12px; font-size:13px; color:var(--ink); }
+  .stamp { border:3px solid var(--stamp); color:var(--stamp); border-radius:10px; padding:8px 16px; transform:rotate(-6deg); font-stretch:75%; font-weight:800; font-size:22px; opacity:.9; }
+  .railline { position:absolute; left:40px; right:40px; top:178px; height:4px; background:var(--ink); border-radius:2px; }
+  .tags { display:grid; grid-template-columns:repeat(3, 1fr); gap:28px; margin-top:52px; }
+  .tag { position:relative; background:var(--tag); border-radius:6px; padding:34px 20px 0; clip-path:polygon(24px 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 0 100%, 0 24px); box-shadow:0 10px 24px rgba(45,35,20,.18); }
+  .tag::before { content:""; position:absolute; top:12px; left:50%; width:14px; height:14px; margin-left:-7px; border-radius:50%; background:var(--ground); box-shadow:inset 0 0 0 3px var(--kraft-deep); }
+  .string { position:absolute; top:-28px; left:50%; width:2px; height:42px; background:var(--ink); }
+  .tag h2 { font-stretch:75%; font-weight:800; font-size:30px; display:flex; align-items:center; gap:10px; }
+  .sw { width:22px; height:22px; border-radius:50%; border:2px solid var(--tag); outline:1px solid var(--kraft-deep); }
+  .meta { color:var(--muted); font-size:13px; margin:4px 0 14px; }
+  .photos { display:flex; gap:8px; }
+  .ph { width:62px; height:82px; border-radius:4px; }
+  .stubs { display:grid; grid-template-columns:1fr 1fr; margin:18px -20px 0; border-top:2px dashed var(--kraft-deep); }
+  .stub { padding:12px 16px 16px; display:flex; flex-direction:column; gap:8px; }
+  .stub + .stub { border-left:2px dashed var(--kraft-deep); }
+  .shot { height:120px; border-radius:4px; background:linear-gradient(#e7ddcf,#d6c8b4); position:relative; overflow:hidden; }
+  .shot i { position:absolute; right:8px; bottom:8px; width:40%; height:55%; border-radius:3px; border:2px solid var(--tag); }
+  .stub b { font-size:14px; }
+  .stub span { font-size:12px; color:var(--muted); }
+  .stub span.borrow { color:var(--stamp); }
+  .foot { position:absolute; left:40px; right:40px; bottom:24px; background:var(--ink); color:var(--tag); border-radius:10px; padding:16px 22px; display:flex; justify-content:space-between; align-items:center; }
+  .foot b { font-size:18px; } .foot span { color:#bfb3a2; font-size:14px; }
+  .btn { background:var(--kraft); color:var(--ink); border-radius:8px; padding:12px 22px; font-weight:700; font-size:16px; }
+</style>
+</head>
+<body>
+  <aside class="rail">
+    <div class="brand">Backdrop Studio</div>
+    <nav class="nav">
+      <a class="on" href="#">New set <small>3 colours</small></a>
+      <a href="#">Products <small>48</small></a>
+      <a href="#">Templates <small>5</small></a>
+    </nav>
+  </aside>
+  <main>
+    <div class="head">
+      <div>
+        <h1>Satin Wrap Midi Dress</h1>
+        <div class="eyebrowless"><span class="chip">Ama · on a model · Front, Back</span> 5 photos sorted into 3 colours</div>
+      </div>
+      <div class="stamp">Sorted · check me</div>
+    </div>
+    <div class="railline"></div>
+    <section class="tags">
+      <article class="tag"><div class="string"></div>
+        <h2><span class="sw" style="background:#141414"></span>Black</h2>
+        <p class="meta">2 photos · front, back</p>
+        <div class="photos"><div class="ph" style="background:#222"></div><div class="ph" style="background:#2b2b2b"></div></div>
+        <div class="stubs">
+          <div class="stub"><div class="shot"><i style="background:#1d1d1d"></i></div><b>Front</b><span>From your photo</span></div>
+          <div class="stub"><div class="shot"><i style="background:#262626"></i></div><b>Back</b><span>From your photo</span></div>
+        </div>
+      </article>
+      <article class="tag"><div class="string"></div>
+        <h2><span class="sw" style="background:#6e1a2b"></span>Wine Red</h2>
+        <p class="meta">1 photo · front</p>
+        <div class="photos"><div class="ph" style="background:#6e1a2b"></div></div>
+        <div class="stubs">
+          <div class="stub"><div class="shot"><i style="background:#6e1a2b"></i></div><b>Front</b><span>From your photo</span></div>
+          <div class="stub"><div class="shot"><i style="background:#6e1a2b"></i></div><b>Back</b><span class="borrow">Design from Black’s back</span></div>
+        </div>
+      </article>
+      <article class="tag"><div class="string"></div>
+        <h2><span class="sw" style="background:#1f6b4a"></span>Emerald</h2>
+        <p class="meta">2 photos · fronts</p>
+        <div class="photos"><div class="ph" style="background:#1f6b4a"></div><div class="ph" style="background:#245c43"></div></div>
+        <div class="stubs">
+          <div class="stub"><div class="shot"><i style="background:#1f6b4a"></i></div><b>Front</b><span>From your photo</span></div>
+          <div class="stub"><div class="shot"><i style="background:#1f6b4a"></i></div><b>Back</b><span class="borrow">Design from Black’s back</span></div>
+        </div>
+      </article>
+    </section>
+    <div class="foot"><div><b>6 images on Ama</b><br><span>About US$1.32 of OpenAI credit · a minute or two each</span></div><div class="btn">Generate 6 images</div></div>
+  </main>
+</body>
+</html>

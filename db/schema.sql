@@ -105,3 +105,55 @@ CREATE INDEX IF NOT EXISTS jobs_photo_idx ON jobs (photo_id, created_at DESC);
 
 -- generated: photos edited by the app · completed: photos uploaded already edited.
 ALTER TABLE products ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'generated';
+
+-- On-model shoots: a template's model (front and back pose) wears every colour of a garment.
+-- Templates made for the earlier background edits keep their `reference` and have no poses.
+ALTER TABLE templates ADD COLUMN IF NOT EXISTS model_front jsonb;
+
+ALTER TABLE templates ADD COLUMN IF NOT EXISTS model_back jsonb;
+
+ALTER TABLE templates ALTER COLUMN reference DROP NOT NULL;
+
+CREATE TABLE IF NOT EXISTS shoots (
+  id uuid PRIMARY KEY,
+  name text NOT NULL,
+  handle text NOT NULL UNIQUE,
+  description text NOT NULL,
+  template_id uuid,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- One generated image per colour and side; `inputs` are the garment photos it's made from.
+CREATE TABLE IF NOT EXISTS shoot_images (
+  id uuid PRIMARY KEY,
+  shoot_id uuid NOT NULL REFERENCES shoots (id) ON DELETE CASCADE,
+  color text NOT NULL,
+  position integer NOT NULL,
+  view text NOT NULL,
+  inputs jsonb NOT NULL,
+  output jsonb,
+  UNIQUE (shoot_id, color, view)
+);
+
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS shoot_image_id uuid;
+
+CREATE INDEX IF NOT EXISTS jobs_shoot_image_idx ON jobs (shoot_image_id, created_at DESC);
+
+-- Any product, any shots: a template is "model" (worn or held) or "scene" (the item alone in a
+-- setting) and lists its own shots, each with a reference photo. Model templates made with the
+-- two fixed poses become a Front + Back shot list.
+ALTER TABLE templates ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'model';
+
+ALTER TABLE templates ADD COLUMN IF NOT EXISTS shots jsonb;
+
+UPDATE templates SET shots = jsonb_build_array(
+    jsonb_build_object('key', 'front', 'name', 'Front', 'reference', model_front),
+    jsonb_build_object('key', 'back', 'name', 'Back', 'reference', model_back))
+  WHERE shots IS NULL AND model_front IS NOT NULL AND model_back IS NOT NULL;
+
+ALTER TABLE shoot_images ADD COLUMN IF NOT EXISTS shot_name text;
+
+ALTER TABLE shoot_images ADD COLUMN IF NOT EXISTS shot_position integer NOT NULL DEFAULT 0;
+
+-- What the product is ("Dress", "Bag"…): Shopify's product type. Sizes may be empty (one size).
+ALTER TABLE products ADD COLUMN IF NOT EXISTS product_type text;

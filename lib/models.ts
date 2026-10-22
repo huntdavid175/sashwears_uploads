@@ -78,15 +78,15 @@ const OUTPUT_TOKENS_1MP: Record<Quality, number> = {
   max: 8320,
 }
 
-/** Rough input cost: source + reference images. Not published per image; a guess. */
+/** Rough input cost per input image. Not published per image; a guess. */
 const INPUT_TOKENS_PER_IMAGE = 1500
 
-/** Rough USD estimate for one edit at the given size. */
-export function estimateCost(model: ModelId, quality: Quality, size: string) {
+/** Rough USD estimate for one edit at the given size, from `inputImages` images (default 2). */
+export function estimateCost(model: ModelId, quality: Quality, size: string, inputImages = 2) {
   const caps = MODEL_CAPS[model]
   const [w, h] = size.split("x").map(Number)
   const areaFactor = (w * h) / (1024 * 1024)
   const outputTokens = OUTPUT_TOKENS_1MP[quality] * areaFactor
-  const inputTokens = INPUT_TOKENS_PER_IMAGE * 2
+  const inputTokens = INPUT_TOKENS_PER_IMAGE * inputImages
   return (outputTokens * caps.price.imageOutput + inputTokens * caps.price.imageInput) / 1_000_000
 }

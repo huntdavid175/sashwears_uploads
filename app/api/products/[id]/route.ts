@@ -1,7 +1,13 @@
 import { after } from "next/server"
 
 import { errorResponse, kickWorker, readJson } from "@/lib/api"
-import { normalizeColorName, normalizeQuantities, normalizeSizes, parsePrice } from "@/lib/dress"
+import {
+  normalizeColorName,
+  normalizeProductType,
+  normalizeQuantities,
+  normalizeSizes,
+  parsePrice,
+} from "@/lib/dress"
 import { deleteImage, toUploadError } from "@/lib/imagekit"
 import { hasQueuedJobs, updateProduct, type ProductPatch } from "@/lib/queue"
 import { StoreError } from "@/lib/store/errors"
@@ -24,7 +30,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/products/[id
 }
 
 /**
- * Edit `{ name?, price?, sizes?, colors?: [{ id, name, quantities }] }`. Renaming the dress or
+ * Edit `{ name?, productType?, price?, sizes?, colors?: [{ id, name, quantities }] }`. Renaming the dress or
  * a colour renames its files on ImageKit.
  */
 export async function PATCH(request: Request, ctx: RouteContext<"/api/products/[id]">) {
@@ -35,6 +41,7 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/products/[
     const patch: ProductPatch = {}
     try {
       if (typeof body.name === "string") patch.name = body.name
+      if (body.productType !== undefined) patch.productType = normalizeProductType(body.productType)
       if (body.price !== undefined) patch.price = parsePrice(body.price)
       if (body.sizes !== undefined) patch.sizes = normalizeSizes(body.sizes)
       if (Array.isArray(body.colors)) {
