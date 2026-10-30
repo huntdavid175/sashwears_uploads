@@ -4,7 +4,7 @@ import { ChevronRightIcon, SparklesIcon, UserRoundPlusIcon } from "lucide-react"
 import Link from "next/link"
 import { useId, useState } from "react"
 
-import { PhotoDrop, usePickedPhotos } from "@/components/photos/photo-drop"
+import { nextKey, PhotoDrop, usePickedPhotos } from "@/components/photos/photo-drop"
 import { groupByColor } from "@/components/photos/sorted-photos"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -35,8 +35,8 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
-import { classifyPhotos, imageUrl, useTemplates } from "@/lib/client"
-import { MAX_SHOOT_PHOTOS } from "@/lib/shoot"
+import { imageUrl, sortBatch, useTemplates } from "@/lib/client"
+import { MAX_BATCH_PHOTOS } from "@/lib/shoot"
 import { isReady, type Template } from "@/lib/types"
 
 import { KindTag } from "./kind-tag"
@@ -45,9 +45,10 @@ import { ShootReview, type Review } from "./shoot-review"
 const nothing = () => ({})
 
 /**
- * "Template set": pick a template and drop every photo of one product; the AI sorts them by
- * colour and by the template's shots and suggests a name and description; then the owner
- * reviews (ShootReview) and generates every colour in every shot.
+ * "Template set": pick a template and drop the photos of any number of products, mixed; the AI
+ * sorts them into products, each by colour and by the template's shots, and suggests names and
+ * descriptions; then the owner reviews (ShootReview) and generates every colour of every product
+ * in every shot.
  */
 export function ShootForm({
   onReviewingChange,
@@ -57,7 +58,7 @@ export function ShootForm({
 }) {
   const id = useId()
   const { templates, error: templatesError } = useTemplates()
-  const photos = usePickedPhotos(MAX_SHOOT_PHOTOS)
+  const photos = usePickedPhotos(MAX_BATCH_PHOTOS)
   const [chosen, setChosen] = useState<string | null>(null)
   const [review, setReviewState] = useState<Review | null>(null)
   const [attempted, setAttempted] = useState(false)
@@ -75,24 +76,29 @@ export function ShootForm({
     onReviewingChange?.(next !== null)
   }
 
-  /** Upload, let the AI sort into the template's shots and describe, group by colour. */
+  /** Upload, let the AI sort into products and the template's shots, group by colour. */
   async function sortPhotos(e: React.FormEvent) {
     e.preventDefault()
     setAttempted(true)
     if (!template) return setError("Pick a template.")
-    if (!photos.picked.length) return setError("Add the product's photos.")
+    if (!photos.picked.length) return setError("Add the product photos.")
     setError(null)
     try {
       const files = await photos.uploadAll((done, total) =>
         setProgress(`Uploading photos ${done} of ${total}…`),
       )
-      setProgress("Sorting by colour and shot…")
-      const result = await classifyPhotos(files, { templateId: template.id, describe: true })
+      setProgress(`Sorting ${files.length} photo${files.length === 1 ? "" : "s"}…`)
+      const result = await sortBatch(template.id, files)
       setReview({
-        name: result.name,
-        description: result.description,
         warning: result.warning,
-        groups: groupByColor(result.photos, template.shots, nothing),
+        products: result.products.map((p) => ({
+          key: nextKey(),
+          name: p.name,
+          description: p.description,
+          productType: p.productType,
+          tags: p.tags,
+          groups: groupByColor(p.photos, template.shots, nothing),
+        })),
       })
       setAttempted(false)
       window.scrollTo({ top: 0, behavior: "smooth" })
@@ -184,8 +190,8 @@ export function ShootForm({
           <CardHeader className="border-b">
             <CardTitle>Product photos</CardTitle>
             <CardDescription>
-              Every photo of one product, in all its colours and from any side. A colour missing a
-              shot borrows it from another colour.
+              Everything at once: different products, all their colours, any side, in any order. A
+              colour missing a shot borrows it from another colour of that product.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -228,10 +234,11 @@ export function ShootForm({
             ) : (
               <SparklesIcon data-icon="inline-start" />
             )}
-            {progress ?? "Sort by colour and shot"}
+            {progress ?? "Sort into products"}
           </Button>
           <p className="text-xs text-muted-foreground">
-            Nothing is generated yet: you check the sorting first.
+            Nothing is generated yet: you check the sorting first. A big upload takes a minute or
+            two.
           </p>
           {error && <FieldError>{error}</FieldError>}
         </CardContent>

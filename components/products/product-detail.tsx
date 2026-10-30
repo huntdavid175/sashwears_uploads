@@ -15,6 +15,7 @@ import { useState } from "react"
 import { Compare } from "@/components/compare"
 import { Elapsed } from "@/components/elapsed"
 import { Page, PageHeader } from "@/components/page"
+import { ZoomImage } from "@/components/photos/zoom-image"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
@@ -192,6 +193,18 @@ export function ProductDetail() {
             {product.sizes.length ? product.sizes.join(" · ") : "One size"} · {stock} in stock
           </span>
         </div>
+        {product.description && (
+          <p className="max-w-prose text-sm text-pretty">{product.description}</p>
+        )}
+        {product.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {product.tags.map((tag) => (
+              <Badge key={tag} variant="outline">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        )}
         {product.note && <p className="max-w-prose text-sm">{product.note}</p>}
       </PageHeader>
 
@@ -306,14 +319,21 @@ function PhotoTile({
           />
         ) : (
           <div style={{ aspectRatio: aspect }}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- ImageKit resizes it */}
-            <img
-              src={imageUrl(shown, { width: PREVIEW_WIDTH })}
-              alt={label}
-              className={
-                running ? "size-full object-contain opacity-50" : "size-full object-contain"
-              }
-            />
+            {running ? (
+              // eslint-disable-next-line @next/next/no-img-element -- ImageKit resizes it
+              <img
+                src={imageUrl(shown, { width: PREVIEW_WIDTH })}
+                alt={label}
+                className="size-full object-contain opacity-50"
+              />
+            ) : (
+              <ZoomImage
+                image={shown}
+                alt={label}
+                width={PREVIEW_WIDTH}
+                className="size-full object-contain"
+              />
+            )}
           </div>
         )}
         {running ? (

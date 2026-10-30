@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 
-import type { PhotoView, Product, Shoot, Shot, StoredImage, Template } from "@/lib/types"
+import type { Batch, PhotoView, Product, Shoot, Shot, StoredImage, Template } from "@/lib/types"
 
 /** fetch + JSON, throwing the server's `{ error }` message on failure. */
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
@@ -130,6 +130,14 @@ export function useShoot(id: string) {
   return { shoot: data, error, refresh, setShoot: setData }
 }
 
+export function useBatch(id: string) {
+  const { data, error, refresh } = usePolled<Batch>(
+    `/api/batches/${encodeURIComponent(id)}`,
+    (b) => b.status === "generating",
+  )
+  return { batch: data, error, refresh }
+}
+
 export type SortedPhoto = {
   fileId: string
   originalName: string
@@ -140,25 +148,50 @@ export type SortedPhoto = {
 export type Classified = {
   name: string
   productType: string
-  description: string
-  /** The shots the photos were sorted into (the template's, or the default ones). */
+  /** The shots the photos were sorted into. */
   shots: Shot[]
   warning?: string
   photos: (SortedPhoto & { color: string })[]
 }
 
-/**
- * Ask the AI how uploaded photos group into colours and shots: the template's shots when
- * `templateId` is given; `describe` also asks for a shop description.
- */
-export function classifyPhotos(
-  files: { fileId: string; originalName: string }[],
-  opts: { templateId?: string; describe?: boolean } = {},
-) {
+/** Ask the AI how one product's uploaded photos group into colours and shots. */
+export function classifyPhotos(files: { fileId: string; originalName: string }[]) {
   return api<Classified>("/api/products/classify", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ files, templateId: opts.templateId, describe: opts.describe }),
+    body: JSON.stringify({ files }),
+  })
+}
+
+export type SortedBatch = {
+  warning?: string
+  products: {
+    name: string
+    productType: string
+    tags: string[]
+    description: string
+    photos: Classified["photos"]
+  }[]
+}
+
+/** Ask the AI how a mixed upload groups into products, colours and the template's shots. */
+export function sortBatch(templateId: string, files: { fileId: string; originalName: string }[]) {
+  return api<SortedBatch>("/api/shoots/sort", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ templateId, files }),
+  })
+}
+
+/** Save a set's finished images as a product. */
+export function saveShoot(
+  id: string,
+  body: { price: string; stock: string; productType: string; tags: string },
+) {
+  return api<Product>(`/api/shoots/${encodeURIComponent(id)}/save`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   })
 }
 
@@ -200,21 +233,26 @@ function saveBlob(blob: Blob, name: string) {
 }
 
 /**
- * Save a shoot as "<handle>.zip": one "<handle>/" folder with every finished image (original
+ * Save sets as "<zipName>.zip": a "<handle>/" folder per set with its finished images (original
  * bytes, straight from ImageKit) and description.txt. Zipped in the browser: Vercel caps
  * function responses at ~4.5MB.
  */
-export async function downloadShootZip(
-  shoot: Shoot,
+export async function downloadShootsZip(
+  shoots: Shoot[],
+  zipName: string,
   onProgress?: (done: number, total: number) => void,
 ) {
   const { strToU8, zipSync } = await import("fflate")
-  const outputs = shoot.colors.flatMap((c) => c.images.flatMap((i) => (i.output ? [i.output] : [])))
+  const outputs = shoots.flatMap((shoot) =>
+    shoot.colors.flatMap((c) =>
+      c.images.flatMap((i) => (i.output ? [{ shoot, output: i.output }] : [])),
+    ),
+  )
   const files: Record<string, Uint8Array> = {}
   let done = 0
   onProgress?.(0, outputs.length)
   await Promise.all(
-    outputs.map(async (output) => {
+    outputs.map(async ({ shoot, output }) => {
       const name = output.filePath.slice(output.filePath.lastIndexOf("/") + 1)
       const url = new URL(output.url)
       url.search = ""
@@ -226,20 +264,19 @@ export async function downloadShootZip(
       onProgress?.(++done, outputs.length)
     }),
   )
-  const text = [
-    shoot.name,
-    "",
-    shoot.description,
-    "",
-    `Colours: ${shoot.colors.map((c) => c.name).join(", ")}`,
-    "",
-  ].join("\n")
-  files[`${shoot.handle}/description.txt`] = strToU8(text)
+  for (const shoot of shoots) {
+    const text = [
+      shoot.name,
+      "",
+      shoot.description,
+      "",
+      `Colours: ${shoot.colors.map((c) => c.name).join(", ")}`,
+      "",
+    ].join("\n")
+    files[`${shoot.handle}/description.txt`] = strToU8(text)
+  }
   // Images are already compressed: store them as they are.
-  saveBlob(
-    new Blob([zipSync(files, { level: 0 })], { type: "application/zip" }),
-    `${shoot.handle}.zip`,
-  )
+  saveBlob(new Blob([zipSync(files, { level: 0 })], { type: "application/zip" }), `${zipName}.zip`)
 }
 
 /** Read width/height in the browser so we can show size and cost before uploading. */

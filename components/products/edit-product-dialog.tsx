@@ -24,8 +24,10 @@ import {
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Spinner } from "@/components/ui/spinner"
+import { Textarea } from "@/components/ui/textarea"
 import { api } from "@/lib/client"
 import { CURRENCY_SYMBOL, DEFAULT_SIZES } from "@/lib/dress"
+import { MAX_DESCRIPTION } from "@/lib/shoot"
 import type { Product } from "@/lib/types"
 
 import { QuantityGrid, SizePicker } from "./fields"
@@ -63,6 +65,8 @@ function EditForm({ product, onSaved }: { product: Product; onSaved: (p: Product
   const id = useId()
   const [name, setName] = useState(product.name ?? "")
   const [productType, setProductType] = useState(product.productType ?? "")
+  const [description, setDescription] = useState(product.description ?? "")
+  const [tags, setTags] = useState(product.tags.join(", "))
   const [price, setPrice] = useState(product.price.toFixed(2))
   const [sizeOptions, setSizeOptions] = useState(() => [
     ...DEFAULT_SIZES,
@@ -91,6 +95,8 @@ function EditForm({ product, onSaved }: { product: Product; onSaved: (p: Product
           body: JSON.stringify({
             ...(product.name || name.trim() ? { name } : {}),
             productType,
+            description,
+            tags,
             price,
             sizes,
             colors,
@@ -134,6 +140,26 @@ function EditForm({ product, onSaved }: { product: Product; onSaved: (p: Product
             placeholder="Dress, Tote Bag…"
             className="max-w-64"
           />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor={`${id}-description`}>Description</FieldLabel>
+          <Textarea
+            id={`${id}-description`}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={MAX_DESCRIPTION}
+            rows={3}
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor={`${id}-tags`}>Tags</FieldLabel>
+          <Input
+            id={`${id}-tags`}
+            value={tags}
+            onChange={(e) => setTags(e.target.value)}
+            placeholder="midi-dress, satin, evening"
+          />
+          <FieldDescription>Separate with commas.</FieldDescription>
         </Field>
         <Field>
           <FieldLabel htmlFor={`${id}-price`}>Price ({CURRENCY_SYMBOL})</FieldLabel>

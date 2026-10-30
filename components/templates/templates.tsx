@@ -38,6 +38,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "@/components/ui/toast"
 import { api, imageUrl, useTemplates } from "@/lib/client"
 import { MODEL_CAPS } from "@/lib/models"
+import { cropsPhoto } from "@/lib/size"
 import { isReady, type Template } from "@/lib/types"
 
 import { TemplateDialog } from "./template-dialog"
@@ -136,6 +137,16 @@ export function Templates() {
                   </CardAction>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3">
+                  {ready &&
+                    t.shots.some((s) =>
+                      cropsPhoto(t.model, s.reference.width, s.reference.height),
+                    ) && (
+                      <p className="text-xs text-destructive">
+                        These photos are a shape {MODEL_CAPS[t.model].label} can&apos;t make, so
+                        results can lose their top and bottom. Edit this template and choose GPT
+                        Image 2.
+                      </p>
+                    )}
                   {ready ? (
                     <ul className="grid grid-cols-4 gap-1.5">
                       {t.shots.map((s) => (

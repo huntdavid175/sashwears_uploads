@@ -53,6 +53,9 @@ const PRODUCT_LINES: Record<GarmentRole, (shot: string) => string> = {
     `shows the ${shot} view of the same product design in a DIFFERENT color: copy how it looks from this side (construction, openings, straps, handles, pockets, zips, fastenings, seams and details) but NOT its color.`,
 }
 
+const KEEP_FRAME =
+  "Keep the whole frame of Image 1: do not zoom in, crop or shift it. Everything it shows must stay in the result, including anything near the top and bottom edges, such as signs, the head, the feet and the floor."
+
 /**
  * Framing for a set image: image 1 is the template's reference for this shot (the model in
  * that pose, or the scene), the rest are product photos in `inputs` order. Template prompt is
@@ -71,8 +74,8 @@ export function composeShootPrompt(
   return [
     `You are given ${inputs.length + 1} images. The result is the "${shot}" shot of a product set.`,
     kind === "model"
-      ? "Image 1 is the MODEL in the pose for this shot. Keep this person exactly as they are: same face, hair, skin, body, pose and expression. Keep the photo's setting, background, lighting, camera angle and framing. Keep the pose: if the model faces away, show the product from behind and do not turn them around."
-      : "Image 1 is the SCENE for this shot. Keep its setting, surfaces, props, background, lighting, color grading, camera angle and framing exactly.",
+      ? `Image 1 is the MODEL in the pose for this shot. Keep this person exactly as they are: same face, hair, skin, body, pose and expression. Keep the photo's setting, background, lighting and camera angle. ${KEEP_FRAME} Keep the pose: if the model faces away, show the product from behind and do not turn them around.`
+      : `Image 1 is the SCENE for this shot. Keep its setting, surfaces, props, background, lighting, color grading and camera angle exactly. ${KEEP_FRAME}`,
     ...inputs.map((input, i) => `Image ${i + 2} ${PRODUCT_LINES[input.role](input.viewName)}`),
     kind === "model"
       ? "Put this product on the model the way it is meant to be used: worn if it is clothing, footwear or jewelry; held, carried or worn on the shoulder if it is a bag or accessory. Replace any clothing or item it takes the place of. Fit it naturally to their body and pose, with realistic drape, folds, shadows and lighting that match the photo."

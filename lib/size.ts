@@ -42,6 +42,20 @@ export function pickSize(model: ModelId, width: number, height: number): string 
   return `${W}x${H}`
 }
 
+/** Below this the model's closest shape is near enough to keep the whole photo. */
+const CROP_RISK = 0.05
+
+/**
+ * Does the model's closest output shape differ enough from this photo that the result loses its
+ * edges? The model fills the frame by zooming in, so a tall photo in a wider size loses its top
+ * and bottom. Only fixed-size models do this; flexible ones match the photo.
+ */
+export function cropsPhoto(model: ModelId, width: number, height: number) {
+  const [w, h] = pickSize(model, width, height).split("x").map(Number)
+  const [a, b] = [w / h, width / height]
+  return 1 - Math.min(a, b) / Math.max(a, b) > CROP_RISK
+}
+
 function to16(n: number) {
   // Round up so the minimum area is never undershot.
   return Math.max(16, Math.ceil(n / 16) * 16)

@@ -6,9 +6,11 @@ import {
   normalizeProductType,
   normalizeQuantities,
   normalizeSizes,
+  normalizeTags,
   parsePrice,
 } from "@/lib/dress"
 import { deleteImage, toUploadError } from "@/lib/imagekit"
+import { cleanDescription } from "@/lib/openai/classify"
 import { hasQueuedJobs, updateProduct, type ProductPatch } from "@/lib/queue"
 import { StoreError } from "@/lib/store/errors"
 import { failStaleJobs } from "@/lib/store/jobs"
@@ -30,7 +32,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/products/[id
 }
 
 /**
- * Edit `{ name?, productType?, price?, sizes?, colors?: [{ id, name, quantities }] }`. Renaming the dress or
+ * Edit `{ name?, productType?, description?, tags?, price?, sizes?, colors?: [{ id, name, quantities }] }`. Renaming the dress or
  * a colour renames its files on ImageKit.
  */
 export async function PATCH(request: Request, ctx: RouteContext<"/api/products/[id]">) {
@@ -42,6 +44,10 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/products/[
     try {
       if (typeof body.name === "string") patch.name = body.name
       if (body.productType !== undefined) patch.productType = normalizeProductType(body.productType)
+      if (typeof body.description === "string") {
+        patch.description = cleanDescription(body.description)
+      }
+      if (body.tags !== undefined) patch.tags = normalizeTags(body.tags)
       if (body.price !== undefined) patch.price = parsePrice(body.price)
       if (body.sizes !== undefined) patch.sizes = normalizeSizes(body.sizes)
       if (Array.isArray(body.colors)) {

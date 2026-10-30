@@ -2,7 +2,7 @@ import "server-only"
 
 import { after } from "next/server"
 
-import { getStoredImage } from "@/lib/imagekit"
+import { getStoredImage, getStoredImages } from "@/lib/imagekit"
 import { StoreError } from "@/lib/store/errors"
 import type { TemplateImages, TemplateInput } from "@/lib/store/templates"
 import type { Template } from "@/lib/types"
@@ -31,6 +31,20 @@ export async function readJson(request: Request): Promise<Record<string, unknown
   const body = await request.json().catch(() => null)
   if (!body || typeof body !== "object") throw new StoreError("invalid", "Expected a JSON body")
   return body as Record<string, unknown>
+}
+
+/** Uploaded files from a request body, looked up on ImageKit, in order. */
+export async function readFiles(files: { fileId?: unknown; originalName?: unknown }[]) {
+  const ids = files.map((f) => {
+    if (typeof f?.fileId !== "string") throw new StoreError("invalid", "Missing fileId")
+    return f.fileId
+  })
+  const images = await getStoredImages(ids)
+  return files.map((f, i) => ({
+    fileId: ids[i],
+    originalName: typeof f.originalName === "string" ? f.originalName.slice(0, 200) : "",
+    image: images[i],
+  }))
 }
 
 /** Pull template fields out of a body; absent fields stay undefined so updates are partial. */

@@ -17,7 +17,7 @@ const KINDS: { value: Kind; label: string; help: string; icon: typeof LayersIcon
   {
     value: "set",
     label: "Template set",
-    help: "Raw photos → every colour in every shot of a template",
+    help: "Raw photos of many products → every colour in every shot of a template",
     icon: LayersIcon,
   },
   {
@@ -29,7 +29,7 @@ const KINDS: { value: Kind; label: string; help: string; icon: typeof LayersIcon
 ]
 
 const HELP: Record<Kind, string> = {
-  set: "Pick a template, drop every photo of one product. The AI sorts them by colour and shot; you check, then it makes the whole set.",
+  set: "Pick a template and drop all your photos, as many products as you like. The AI sorts them into products, colours and shots; you check, then it makes every image.",
   completed:
     "Drop every finished photo of one product and add the price. The AI sorts them by colour; nothing is edited.",
 }
