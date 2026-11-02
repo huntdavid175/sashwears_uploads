@@ -81,6 +81,7 @@ export function SortedPhotoTile({
   groupKey,
   groups,
   shots,
+  moveItems,
   onView,
   onMove,
   onDrop,
@@ -91,12 +92,14 @@ export function SortedPhotoTile({
   groups: ColorGroup[]
   /** The shots a photo can be: the template's, or the default ones. */
   shots: Shot[]
+  /** Where the photo can go, when that's more than this product's colours. */
+  moveItems?: { value: string; label: string }[]
   onView: (view: PhotoView) => void
   onMove: (target: string) => void
   onDrop: () => void
   disabled?: boolean
 }) {
-  const colorItems = [
+  const colorItems = moveItems ?? [
     ...groups.map((g, i) => ({ value: g.key, label: colorLabel(g, i) })),
     { value: NEW_GROUP, label: "New colour" },
   ]

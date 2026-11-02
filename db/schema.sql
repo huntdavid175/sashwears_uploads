@@ -157,3 +157,24 @@ ALTER TABLE shoot_images ADD COLUMN IF NOT EXISTS shot_position integer NOT NULL
 
 -- What the product is ("Dress", "Bag"…): Shopify's product type. Sizes may be empty (one size).
 ALTER TABLE products ADD COLUMN IF NOT EXISTS product_type text;
+
+-- One upload of many products: a set per product, sharing a batch. Older sets have none.
+ALTER TABLE shoots ADD COLUMN IF NOT EXISTS batch_id uuid;
+
+ALTER TABLE shoots ADD COLUMN IF NOT EXISTS batch_position integer NOT NULL DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS shoots_batch_idx ON shoots (batch_id, batch_position);
+
+ALTER TABLE shoots ADD COLUMN IF NOT EXISTS product_type text;
+
+-- A set saved as a product: unique, so a set saves once; deleting the product frees it again.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS shoot_id uuid;
+
+CREATE UNIQUE INDEX IF NOT EXISTS products_shoot_key ON products (shoot_id);
+
+ALTER TABLE products ADD COLUMN IF NOT EXISTS description text;
+
+-- Shopify tags: suggested on the set, kept on the product.
+ALTER TABLE shoots ADD COLUMN IF NOT EXISTS tags text[] NOT NULL DEFAULT '{}';
+
+ALTER TABLE products ADD COLUMN IF NOT EXISTS tags text[] NOT NULL DEFAULT '{}';

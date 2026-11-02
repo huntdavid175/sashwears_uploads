@@ -41,11 +41,28 @@ vi.mock("@/lib/openai/name", async (importOriginal) => {
   }
 })
 
+const details = vi.hoisted(() => ({ calls: 0, fail: false }))
+
+vi.mock("@/lib/openai/details", () => ({
+  arrangeProduct: async () => {
+    details.calls++
+    if (details.fail) throw new Error("OpenAI is down")
+    return {
+      sizes: ["S", "M"],
+      quantities: { Black: { S: 3 } },
+      tags: ["wrap-dress"],
+      productType: "Dress",
+    }
+  },
+}))
+
 const ik = vi.hoisted(() => ({
   uploads: [] as { folder: string; fileName: string; replace: boolean }[],
   renames: [] as { filePath: string; newFileName: string }[],
   moves: [] as { filePath: string; folder: string }[],
   deletes: [] as string[],
+  copies: [] as string[],
+  failCopy: "",
 }))
 
 vi.mock("@/lib/imagekit", async (importOriginal) => {
@@ -74,6 +91,11 @@ vi.mock("@/lib/imagekit", async (importOriginal) => {
       return file(path)
     },
     // Re-upload under a new name (and maybe folder), recorded as a rename (+ move).
+    copyImage: async (_: unknown, folder: string, fileName: string) => {
+      ik.copies.push(`${folder}/${fileName}`)
+      if (fileName === ik.failCopy) throw new Error("ImageKit is down")
+      return file(`${folder}/${fileName}`)
+    },
     relocateImage: async (f: { filePath: string }, folder: string, fileName: string) => {
       const target = `${folder}/${fileName}`
       if (f.filePath === target) return f
@@ -88,15 +110,16 @@ vi.mock("@/lib/imagekit", async (importOriginal) => {
 })
 
 const {
+  createBatch,
   createCompletedDress,
-  createShootFromPhotos,
   regeneratePhoto,
   regenerateShootImage,
   runNext,
+  saveShootAsProduct,
   updateProduct,
 } = await import("./queue")
-const { getShoot } = await import("./store/shoots")
-const { createProduct, getProduct } = await import("./store/products")
+const { getBatch, getShoot } = await import("./store/shoots")
+const { createProduct, deleteProduct, getProduct } = await import("./store/products")
 const { createTemplate, updateTemplate } = await import("./store/templates")
 
 let db: Awaited<ReturnType<typeof useTestDb>>
@@ -105,7 +128,15 @@ beforeEach(async () => {
   db = await useTestDb()
   Object.assign(edit, { fail: false, calls: [], shootCalls: [] })
   Object.assign(naming, { name: "Satin Wrap Midi Dress", calls: 0 })
-  Object.assign(ik, { uploads: [], renames: [], moves: [], deletes: [] })
+  Object.assign(details, { calls: 0, fail: false })
+  Object.assign(ik, {
+    uploads: [],
+    renames: [],
+    moves: [],
+    deletes: [],
+    copies: [],
+    failCopy: "",
+  })
 })
 
 afterEach(async () => {
@@ -308,6 +339,14 @@ describe("completed dresses", () => {
 describe("sets", () => {
   const pose = () => storedImage(1024, 1536)
 
+  /** A batch of one product. */
+  async function createShootFromPhotos({
+    templateId,
+    ...product
+  }: Parameters<typeof createBatch>[1][number] & { templateId: string }) {
+    return (await createBatch(templateId, [product])).shoots[0]
+  }
+
   async function startShoot(existing?: Template) {
     const template =
       existing ??
@@ -407,6 +446,164 @@ describe("sets", () => {
       "woven-raffia-tote-bag-tan-side.png",
       "woven-raffia-tote-bag-tan-inside.png",
     ])
+  })
+
+  it("makes a set per product, in one batch, with a folder each", async () => {
+    const template = await createTemplate(
+      { name: "Ama", prompt: "soft studio light" },
+      { shots: ["Front", "Back"].map((name) => ({ name, reference: pose() })) },
+    )
+    const photo = (view: string) => ({ view, image: storedImage(800, 1200) })
+    const batch = await createBatch(template.id, [
+      {
+        name: "Satin Midi Dress",
+        description: "Satin.",
+        colors: [
+          { name: "Black", photos: [photo("front"), photo("back")] },
+          { name: "Wine", photos: [photo("front")] },
+        ],
+      },
+      {
+        name: "Linen Shirt Dress",
+        description: "Linen.",
+        colors: [{ name: "White", photos: [photo("front"), photo("back")] }],
+      },
+      // Same name as the first: its own folder, not an error.
+      {
+        name: "Satin Midi Dress",
+        description: "",
+        colors: [{ name: "Black", photos: [photo("front")] }],
+      },
+    ])
+    expect(batch.status).toBe("generating")
+    expect(batch.shoots.map((s) => s.handle)).toEqual([
+      "satin-midi-dress",
+      "linen-shirt-dress",
+      "satin-midi-dress-2",
+    ])
+    expect(batch.shoots.map((s) => s.colors.flatMap((c) => c.images).length)).toEqual([4, 2, 2])
+    // Wine's back borrows Black's: colours never lend across products.
+    expect(batch.shoots[0].colors[1].images[1].inputs.at(-1)).toMatchObject({
+      role: "design",
+      color: "Black",
+    })
+    expect(batch.shoots[2].colors[0].images[1].inputs.every((i) => i.role === "colour")).toBe(true)
+
+    await drain()
+    const done = await getBatch(batch.id)
+    expect(done.status).toBe("ready")
+    expect(ik.uploads.map((u) => u.folder)).toEqual([
+      ...Array(4).fill("/backdrop-studio/shoots/satin-midi-dress"),
+      ...Array(2).fill("/backdrop-studio/shoots/linen-shirt-dress"),
+      ...Array(2).fill("/backdrop-studio/shoots/satin-midi-dress-2"),
+    ])
+    await expect(getBatch(batch.shoots[0].id)).rejects.toThrow(/not found/)
+  })
+
+  describe("saving as a product", () => {
+    const price = { price: 450, stock: "3 black small", productType: "", tags: [] }
+
+    /** Black's two images finish; Wine Red's fail. */
+    async function halfDone() {
+      const { shoot } = await startShoot()
+      await runNext()
+      await runNext()
+      edit.fail = true
+      await drain()
+      edit.fail = false
+      return shoot
+    }
+
+    it("keeps what finished and leaves out colours with no image", async () => {
+      const shoot = await halfDone()
+      expect((await getShoot(shoot.id)).status).toBe("attention")
+
+      const product = await saveShootAsProduct(shoot.id, price)
+      expect(product).toMatchObject({
+        kind: "completed",
+        name: "Satin Wrap Midi Dress",
+        handle: "satin-wrap-midi-dress",
+        description: "A wrap dress.",
+        productType: "Dress",
+        price: 450,
+        sizes: ["S", "M"],
+        tags: ["wrap-dress"],
+        status: "ready",
+      })
+      // Listed gets its number, everything else 0.
+      expect(product.colors[0].quantities).toEqual({ S: 3, M: 0 })
+      expect(product.colors.map((c) => [c.name, c.photos.map((p) => p.view)])).toEqual([
+        ["Black", ["front", "back"]],
+      ])
+      expect(product.colors[0].photos[0].output).toEqual(product.colors[0].photos[0].source)
+      expect(ik.copies).toEqual([
+        "/backdrop-studio/dresses/satin-wrap-midi-dress/satin-wrap-midi-dress-black-front.png",
+        "/backdrop-studio/dresses/satin-wrap-midi-dress/satin-wrap-midi-dress-black-back.png",
+      ])
+      expect(ik.deletes).toEqual([])
+      expect((await getShoot(shoot.id)).productId).toBe(product.id)
+    })
+
+    it("saves one image of a colour when the rest of it failed", async () => {
+      const { shoot } = await startShoot()
+      await runNext()
+      edit.fail = true
+      await drain()
+      const product = await saveShootAsProduct(shoot.id, price)
+      expect(product.colors.map((c) => [c.name, c.photos.length])).toEqual([["Black", 1]])
+    })
+
+    it("keeps the owner's tags and type, and needs no AI when nothing's left to fill", async () => {
+      const shoot = await halfDone()
+      details.calls = 0
+      const product = await saveShootAsProduct(shoot.id, {
+        price: 450,
+        stock: "",
+        productType: "Gown",
+        tags: ["evening"],
+      })
+      expect(details.calls).toBe(0)
+      expect(product).toMatchObject({ productType: "Gown", tags: ["evening"], sizes: [] })
+      expect(product.colors[0].quantities).toEqual({ "One size": 0 })
+    })
+
+    it("saves nothing if the stock can't be read", async () => {
+      const shoot = await halfDone()
+      details.fail = true
+      await expect(saveShootAsProduct(shoot.id, price)).rejects.toThrow(/read the stock/)
+      expect(ik.copies).toEqual([])
+      expect((await getShoot(shoot.id)).productId).toBeUndefined()
+    })
+
+    it("saves once, and again only if the product is deleted", async () => {
+      const shoot = await halfDone()
+      const product = await saveShootAsProduct(shoot.id, price)
+      await expect(saveShootAsProduct(shoot.id, price)).rejects.toThrow(/already a product/)
+      await deleteProduct(product.id)
+      expect((await saveShootAsProduct(shoot.id, price)).handle).toBe("satin-wrap-midi-dress")
+    })
+
+    it("won't save while generating or with no image at all", async () => {
+      const { shoot } = await startShoot()
+      await expect(saveShootAsProduct(shoot.id, price)).rejects.toThrow(/still generating/)
+      edit.fail = true
+      await drain()
+      await expect(saveShootAsProduct(shoot.id, price)).rejects.toThrow(/no finished images/)
+      expect(ik.copies).toEqual([])
+    })
+
+    it("removes what it copied when a save fails, so it can be tried again", async () => {
+      const shoot = await halfDone()
+      ik.failCopy = "satin-wrap-midi-dress-black-back.png"
+      await expect(saveShootAsProduct(shoot.id, price)).rejects.toThrow(/ImageKit is down/)
+      expect(ik.deletes).toEqual([
+        "id:/backdrop-studio/dresses/satin-wrap-midi-dress/satin-wrap-midi-dress-black-front.png",
+      ])
+      expect((await getShoot(shoot.id)).productId).toBeUndefined()
+
+      ik.failCopy = ""
+      expect((await saveShootAsProduct(shoot.id, price)).colors[0].photos).toHaveLength(2)
+    })
   })
 
   it("redoes one image with the same photos and settings, replacing its file", async () => {

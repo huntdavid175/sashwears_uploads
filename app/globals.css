@@ -34,6 +34,7 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-primary-ink: var(--primary-ink);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -49,10 +50,13 @@
 
 :root {
   /* Retail mosaic: white modules ruled with hairlines on a light-grey canvas, dense ink text,
-     one utility red for tabs, primary actions, prices and attention. Tight radii. */
+     one light green for tabs, primary actions and prices, deep green for text on it. Red only for
+     failures and deleting. Tight radii. */
   --canvas: #f2f2f2;
   --module: #ffffff;
   --ink: #111111;
+  --green: #86efac;
+  --green-ink: #166534;
   --red: #e60012;
   --rule: #e0e0e0;
   --rule-strong: #d6d6d6;
@@ -64,8 +68,9 @@
   --card-foreground: var(--ink);
   --popover: var(--module);
   --popover-foreground: var(--ink);
-  --primary: var(--red);
-  --primary-foreground: #ffffff;
+  --primary: var(--green);
+  --primary-foreground: #111111;
+  --primary-ink: var(--green-ink);
   --secondary: var(--fill);
   --secondary-foreground: var(--ink);
   --muted: var(--fill);
@@ -75,7 +80,7 @@
   --destructive: var(--red);
   --border: var(--rule);
   --input: var(--rule-strong);
-  --ring: var(--red);
+  --ring: var(--green-ink);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -84,20 +89,22 @@
   --radius: 0.25rem;
   --sidebar: var(--module);
   --sidebar-foreground: var(--ink);
-  --sidebar-primary: var(--red);
-  --sidebar-primary-foreground: #ffffff;
+  --sidebar-primary: var(--green);
+  --sidebar-primary-foreground: #111111;
   --sidebar-accent: var(--fill);
   --sidebar-accent-foreground: var(--ink);
   --sidebar-border: var(--rule);
-  --sidebar-ring: var(--red);
+  --sidebar-ring: var(--green-ink);
 }
 
 .dark {
   /* The same mosaic after dark: an ink canvas, lifted near-black modules, hairlines that
-     still read, and the red lifted so tabs and prices hold contrast. */
+     still read. Light green is bright enough to be its own text colour here. */
   --canvas: #0f0f0f;
   --module: #1a1a1a;
   --ink: #f2f2f2;
+  --green: #86efac;
+  --green-ink: #86efac;
   --red: #ff3b46;
   --rule: #2e2e2e;
   --rule-strong: #3a3a3a;
@@ -109,9 +116,9 @@
   --card-foreground: var(--ink);
   --popover: var(--module);
   --popover-foreground: var(--ink);
-  --primary: var(--red);
-  /* Ink on the lifted red: white on #ff3b46 is ~3.5:1, ink is ~5.3:1. */
+  --primary: var(--green);
   --primary-foreground: #111111;
+  --primary-ink: var(--green-ink);
   --secondary: var(--fill);
   --secondary-foreground: var(--ink);
   --muted: var(--fill);
@@ -121,7 +128,7 @@
   --destructive: var(--red);
   --border: var(--rule);
   --input: var(--rule-strong);
-  --ring: var(--red);
+  --ring: var(--green-ink);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -129,12 +136,12 @@
   --chart-5: oklch(0.269 0 0);
   --sidebar: var(--module);
   --sidebar-foreground: var(--ink);
-  --sidebar-primary: var(--red);
+  --sidebar-primary: var(--green);
   --sidebar-primary-foreground: #111111;
   --sidebar-accent: var(--fill);
   --sidebar-accent-foreground: var(--ink);
   --sidebar-border: var(--rule);
-  --sidebar-ring: var(--red);
+  --sidebar-ring: var(--green-ink);
 }
 
 @layer base {
@@ -143,15 +150,15 @@
   }
   body {
     @apply bg-background text-foreground;
-    caret-color: var(--red);
-    accent-color: var(--red);
+    caret-color: var(--green-ink);
+    accent-color: var(--green-ink);
   }
   html {
     @apply font-sans;
     font-variant-numeric: tabular-nums;
   }
   ::selection {
-    background: color-mix(in oklab, var(--red) 22%, transparent);
+    background: color-mix(in oklab, var(--green) 45%, transparent);
   }
   * {
     scrollbar-color: var(--rule-strong) transparent;

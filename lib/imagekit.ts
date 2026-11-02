@@ -105,6 +105,29 @@ export async function getStoredImage(fileId: string): Promise<StoredImage> {
   return { fileId: id, filePath, url, width, height, updatedAt }
 }
 
+/** File lookups at once: a big batch shouldn't run into ImageKit's API rate limit. */
+const LOOKUPS = 8
+
+/** `fn` over `items`, `limit` at a time; results in order. */
+export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>) {
+  const results = new Array<R>(items.length)
+  let next = 0
+  await Promise.all(
+    Array.from({ length: limit }, async () => {
+      while (next < items.length) {
+        const i = next++
+        results[i] = await fn(items[i])
+      }
+    }),
+  )
+  return results
+}
+
+/** Several files, in order. */
+export function getStoredImages(fileIds: string[]): Promise<StoredImage[]> {
+  return mapLimit(fileIds, LOOKUPS, getStoredImage)
+}
+
 /** Original bytes (no ImageKit optimisation) for sending to OpenAI. */
 export async function downloadImage(image: StoredImage): Promise<Buffer> {
   const url = new URL(image.url)
@@ -209,6 +232,15 @@ export async function relocateImage(
     console.warn("[imagekit] couldn't delete moved file:", toUploadError(err).message),
   )
   return moved
+}
+
+/** A second file with the same bytes; the original stays. */
+export async function copyImage(
+  file: StoredImage,
+  folder: string,
+  fileName: string,
+): Promise<StoredImage> {
+  return uploadImage({ data: await downloadImage(file), folder, fileName })
 }
 
 export async function deleteImage(fileId: string) {

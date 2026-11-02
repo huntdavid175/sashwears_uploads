@@ -1,16 +1,21 @@
 import "server-only"
 
 import {
+  copyImage,
+  deleteImage,
   downloadImage,
   imagekitFolder,
+  mapLimit,
   putImage,
   ReplacedError,
   relocateImage,
   toUploadError,
 } from "@/lib/imagekit"
+import { arrangeProduct, type ProductDetails } from "@/lib/openai/details"
 import { composeShootPrompt, editImage, editImages, toEditError } from "@/lib/openai/edit"
+import { normalizeQuantities } from "@/lib/dress"
 import { cleanName, nameProduct } from "@/lib/openai/name"
-import { planShoot } from "@/lib/shoot"
+import { finishedColors, planShoot } from "@/lib/shoot"
 import { pickSize } from "@/lib/size"
 import { StoreError } from "@/lib/store/errors"
 import {
@@ -35,8 +40,8 @@ import {
   setPhotoOutput,
 } from "@/lib/store/products"
 import {
-  createShoot,
-  freeShootHandle,
+  createBatch as saveBatch,
+  freeShootHandles,
   getShoot,
   getShootImageContext,
   setShootImageOutput,
@@ -44,6 +49,7 @@ import {
 import { getDefaultTemplate, getTemplate, slugify } from "@/lib/store/templates"
 import {
   isReady,
+  type Batch,
   type Job,
   type PhotoView,
   type Product,
@@ -205,6 +211,8 @@ export async function regeneratePhoto(productId: string, photoId: string): Promi
 export type ProductPatch = {
   name?: string
   productType?: string
+  description?: string
+  tags?: string[]
   price?: number
   sizes?: string[]
   colors?: { id: string; name: string; quantities: Record<string, number> }[]
@@ -304,31 +312,136 @@ export async function createCompletedDress(input: CompletedDressInput): Promise<
 }
 
 export type ShootInput = {
-  templateId: string
   name: string
   description: string
+  productType?: string
+  tags?: string[]
   colors: { name: string; photos: { view: PhotoView; image: StoredImage }[] }[]
 }
 
 /**
- * Plan every colour × every shot of the template from the sorted photos, save, and queue the
- * edits. Photos sorted into a shot the template doesn't have still lend colour and material.
+ * Plan every colour × every shot of the template for each product, save, and queue the edits.
+ * Photos sorted into a shot the template doesn't have still lend colour and material.
  */
-export async function createShootFromPhotos(input: ShootInput): Promise<Shoot> {
-  const template = await getTemplate(input.templateId)
+export async function createBatch(templateId: string, products: ShootInput[]): Promise<Batch> {
+  const template = await getTemplate(templateId)
   if (!isReady(template)) {
     throw new StoreError("invalid", `Add the shots and their photos to "${template.name}" first`)
   }
-  const handle = await freeShootHandle(input.name)
-  return createShoot(
-    {
-      name: input.name,
-      handle,
-      description: input.description,
-      images: planShoot(input.colors, template.shots),
-    },
+  const handles = await freeShootHandles(products.map((p) => p.name))
+  return saveBatch(
+    products.map((p, i) => ({
+      name: p.name,
+      handle: handles[i],
+      description: p.description,
+      productType: p.productType,
+      tags: p.tags,
+      images: planShoot(p.colors, template.shots),
+    })),
     template,
   )
+}
+
+/** Images copied to ImageKit at once: each is held in memory on the way through. */
+const COPIES = 4
+
+/**
+ * Save a set's finished images as a product, ready as it stands (like a completed product). Colours
+ * with no finished image are left out. The AI reads the owner's stock note into sizes and
+ * quantities (the rest are 0) and fills in tags and type if they're empty; if it can't, nothing is
+ * saved. The images are copied: redoing one replaces its file, which mustn't take the product's
+ * photo with it.
+ */
+export async function saveShootAsProduct(
+  shootId: string,
+  input: { price: number; stock: string; productType?: string; tags: string[] },
+): Promise<Product> {
+  const shoot = await getShoot(shootId)
+  if (shoot.productId) throw new StoreError("conflict", `${shoot.name} is already a product`)
+  if (shoot.status === "generating") {
+    throw new StoreError("invalid", `${shoot.name} is still generating`)
+  }
+  const colors = finishedColors(shoot)
+  if (!colors.length) throw new StoreError("invalid", `${shoot.name} has no finished images`)
+  const details = await readDetails(shoot, input)
+
+  const handle = await freeHandle(shoot.name)
+  const folder = dressFolder(handle)
+  // Every copy settles before going on: one left running would outlive the clean-up, and its
+  // file would block the retry (ImageKit never overwrites).
+  const copied: { color: string; view: PhotoView; file: StoredImage }[] = []
+  const failures: unknown[] = []
+  await mapLimit(
+    colors.flatMap((color) => color.images.map((image) => ({ color, image }))),
+    COPIES,
+    async ({ color, image }) => {
+      const output = image.output!
+      const ext = output.filePath.slice(output.filePath.lastIndexOf(".") + 1).toLowerCase()
+      const name = photoFileName({ handle }, color, image, ext)
+      try {
+        const file = await copyImage(output, folder, name)
+        copied.push({ color: color.name, view: image.view, file })
+      } catch (err) {
+        failures.push(err)
+      }
+    },
+  )
+  try {
+    if (failures.length) throw failures[0]
+    return await createCompletedProduct({
+      name: shoot.name,
+      handle,
+      productType: input.productType || details.productType || undefined,
+      tags: input.tags.length ? input.tags : details.tags,
+      price: input.price,
+      sizes: details.sizes,
+      description: shoot.description,
+      shootId,
+      colors: colors.map((color) => ({
+        name: color.name,
+        quantities: normalizeQuantities(details.quantities[color.name], details.sizes),
+        // In shot order: copies finish in any order.
+        photos: color.images.map((image) => {
+          const copy = copied.find((c) => c.color === color.name && c.view === image.view)!
+          return { view: copy.view, image: copy.file }
+        }),
+      })),
+    })
+  } catch (err) {
+    await Promise.all(
+      copied.map(({ file }) =>
+        deleteImage(file.fileId).catch((e) =>
+          console.warn("[queue] couldn't delete a copy:", toUploadError(e).message),
+        ),
+      ),
+    )
+    if (err instanceof StoreError) throw err
+    throw new StoreError("invalid", `Couldn't save ${shoot.name}: ${toUploadError(err).message}`)
+  }
+}
+
+/** Only asks the AI when there's something for it to do. */
+async function readDetails(
+  shoot: Shoot,
+  input: { stock: string; productType?: string; tags: string[] },
+): Promise<ProductDetails> {
+  if (!input.stock && input.tags.length && input.productType) {
+    return { sizes: [], quantities: {}, tags: [], productType: "" }
+  }
+  try {
+    return await arrangeProduct({
+      name: shoot.name,
+      description: shoot.description,
+      colors: {
+        all: shoot.colors.map((c) => c.name),
+        finished: finishedColors(shoot).map((c) => c.name),
+      },
+      stock: input.stock,
+    })
+  } catch (err) {
+    if (err instanceof StoreError) throw err
+    throw new StoreError("invalid", `Couldn't read the stock: ${toEditError(err).message}`)
+  }
 }
 
 /** Make one shoot image again, from the same photos and template settings as before. */

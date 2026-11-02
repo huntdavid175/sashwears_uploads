@@ -1,3 +1,4 @@
+import { normalizeTags } from "./dress"
 import { describe, expect, it } from "vitest"
 
 import {
@@ -51,5 +52,17 @@ describe("prices in cedis", () => {
     const { formatPrice, CURRENCY_SYMBOL } = await import("./dress")
     expect(CURRENCY_SYMBOL).toBe("GH₵")
     expect(formatPrice(1250.5)).toBe("GH₵1,250.50")
+  })
+})
+
+describe("normalizeTags", () => {
+  it("makes tags Shopify's import takes, from a list or comma-separated text", () => {
+    expect(normalizeTags("Midi Dress, satin,  Été!, satin,,")).toEqual([
+      "midi-dress",
+      "satin",
+      "ete",
+    ])
+    expect(normalizeTags(["Wrap Dress", 3])).toEqual(["wrap-dress"])
+    expect(normalizeTags(undefined)).toEqual([])
   })
 })

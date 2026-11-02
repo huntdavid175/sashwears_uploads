@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { estimateCost } from "./models"
-import { pickSize } from "./size"
+import { cropsPhoto, pickSize } from "./size"
 
 function parse(size: string) {
   const [w, h] = size.split("x").map(Number)
@@ -71,5 +71,17 @@ describe("estimateCost", () => {
     expect(estimateCost("gpt-image-2", "low", "1024x1024")).toBeLessThan(
       estimateCost("gpt-image-2", "high", "1024x1024"),
     )
+  })
+})
+
+describe("cropsPhoto", () => {
+  it("warns when a fixed-size model can't match a tall phone photo", () => {
+    expect(cropsPhoto("gpt-image-1.5", 941, 1671)).toBe(true)
+    expect(pickSize("gpt-image-1.5", 941, 1671)).toBe("1024x1536")
+  })
+
+  it("is fine when the shapes match, or the model takes any shape", () => {
+    expect(cropsPhoto("gpt-image-1.5", 1024, 1536)).toBe(false)
+    expect(cropsPhoto("gpt-image-2", 941, 1671)).toBe(false)
   })
 })

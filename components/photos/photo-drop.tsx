@@ -118,14 +118,14 @@ export function PhotoDrop({
         }}
         aria-invalid={invalid || undefined}
         className={cn(
-          "flex cursor-pointer items-center justify-center gap-3 rounded-sm border border-dashed border-input bg-muted px-4 py-8 text-sm text-muted-foreground hover:border-primary hover:text-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50 aria-invalid:border-destructive",
-          dragging && "border-primary bg-primary/5 text-foreground",
+          "flex cursor-pointer items-center justify-center gap-3 rounded-sm border border-dashed border-input bg-muted px-4 py-8 text-sm text-muted-foreground hover:border-primary-ink hover:text-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50 aria-invalid:border-destructive",
+          dragging && "border-primary-ink bg-primary/5 text-foreground",
         )}
       >
         <ImagePlusIcon className="size-5 shrink-0" />
         <span>
-          <span className="font-semibold text-primary">Choose photos</span> or drop them here. Any
-          number, PNG, JPEG or WebP.
+          <span className="font-semibold text-primary-ink">Choose photos</span> or drop them here.
+          Any number, PNG, JPEG or WebP.
         </span>
         <input
           id={id}

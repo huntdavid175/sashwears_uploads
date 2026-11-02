@@ -1,4 +1,4 @@
-/** Switches for features that exist but aren't shown yet. */
+/** Switches for features that can be hidden without removing them. */
 
-/** "Export to Shopify" buttons (Dresses list and dress page). The API stays available. */
-export const SHOPIFY_EXPORT = false
+/** "Export to Shopify" buttons (Products list and product page). The API stays available. */
+export const SHOPIFY_EXPORT = true

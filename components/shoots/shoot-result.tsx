@@ -1,12 +1,20 @@
 "use client"
 
-import { DownloadIcon, FolderDownIcon, PlusIcon, RefreshCwIcon, RotateCcwIcon } from "lucide-react"
+import {
+  DownloadIcon,
+  FolderDownIcon,
+  PackagePlusIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  RotateCcwIcon,
+} from "lucide-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useState } from "react"
 
 import { Elapsed } from "@/components/elapsed"
 import { Page, PageHeader } from "@/components/page"
+import { ZoomImage } from "@/components/photos/zoom-image"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -15,63 +23,105 @@ import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { toast } from "@/components/ui/toast"
-import { api, downloadShootZip, imageUrl, useShoot } from "@/lib/client"
+import { api, downloadShootsZip, imageUrl, useBatch, useShoot } from "@/lib/client"
+import { finishedColors } from "@/lib/shoot"
 import type { Shoot, ShootImage } from "@/lib/types"
+
+import { SaveProductsDialog } from "./save-products-dialog"
 
 /** Tiles are at most ~14rem wide; 2x for sharp screens. */
 const PREVIEW_WIDTH = 480
+
+function LoadError({ message }: { message: string }) {
+  return (
+    <Page>
+      <Alert variant="destructive">
+        <AlertTitle>Couldn&apos;t load this</AlertTitle>
+        <AlertDescription>{message}</AlertDescription>
+      </Alert>
+    </Page>
+  )
+}
+
+function Loading() {
+  return (
+    <Page>
+      <Skeleton className="h-16" />
+      <Skeleton className="h-96" />
+    </Page>
+  )
+}
+
+/** Start one image of a set again; returns whether it started. */
+async function startRedo(shootId: string, image: ShootImage) {
+  try {
+    return await api<Shoot>(`/api/shoots/${shootId}/images/${image.id}/regenerate`, {
+      method: "POST",
+    })
+  } catch (err) {
+    toast.add({ type: "error", title: "Couldn't start it", description: (err as Error).message })
+  }
+}
 
 /** A set as it generates (polled), from the id in the URL. */
 export function ShootResult() {
   const { id } = useParams<{ id: string }>()
   const { shoot, error, refresh, setShoot } = useShoot(id)
 
-  async function redo(image: ShootImage) {
-    try {
-      setShoot(
-        await api<Shoot>(`/api/shoots/${id}/images/${image.id}/regenerate`, { method: "POST" }),
-      )
-      refresh()
-    } catch (err) {
-      toast.add({ type: "error", title: "Couldn't start it", description: (err as Error).message })
-    }
+  async function redo(_: Shoot, image: ShootImage) {
+    const next = await startRedo(id, image)
+    if (!next) return
+    setShoot(next)
+    refresh()
   }
 
-  if (error && !shoot) {
-    return (
-      <Page>
-        <Alert variant="destructive">
-          <AlertTitle>Couldn&apos;t load this set</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      </Page>
-    )
-  }
-  if (!shoot) {
-    return (
-      <Page>
-        <Skeleton className="h-16" />
-        <Skeleton className="h-96" />
-      </Page>
-    )
-  }
-  return <ShootView shoot={shoot} onRedo={redo} />
+  if (error && !shoot) return <LoadError message={error} />
+  if (!shoot) return <Loading />
+  return <SetsView shoots={[shoot]} onRedo={redo} onSaved={refresh} />
 }
 
-/** Every colour's shots as they finish (a contact sheet), then one .zip of the folder. */
-export function ShootView({
-  shoot,
+/** A whole upload as it generates (polled), from the id in the URL. */
+export function BatchResult() {
+  const { id } = useParams<{ id: string }>()
+  const { batch, error, refresh } = useBatch(id)
+
+  async function redo(shoot: Shoot, image: ShootImage) {
+    if (await startRedo(shoot.id, image)) refresh()
+  }
+
+  if (error && !batch) return <LoadError message={error} />
+  if (!batch) return <Loading />
+  return <SetsView shoots={batch.shoots} onRedo={redo} onSaved={refresh} />
+}
+
+/** Every product's colours and shots as they finish (a contact sheet), then one .zip of it all. */
+export function SetsView({
+  shoots,
   onRedo,
+  onSaved,
 }: {
-  shoot: Shoot
-  onRedo: (image: ShootImage) => void
+  shoots: Shoot[]
+  onRedo: (shoot: Shoot, image: ShootImage) => void
+  onSaved: () => void
 }) {
   const [zipping, setZipping] = useState<string | null>(null)
+  const [saving, setSaving] = useState<Shoot[]>([])
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const many = shoots.length > 1
+  const savable = shoots.filter(canSave)
 
-  async function download(s: Shoot) {
+  function openSave(list: Shoot[]) {
+    setSaving(list)
+    setDialogOpen(true)
+  }
+
+  async function download() {
     setZipping("Preparing…")
     try {
-      await downloadShootZip(s, (done, total) => setZipping(`Downloading ${done} of ${total}…`))
+      const zipName = many ? `batch-${shoots[0].createdAt.slice(0, 10)}` : shoots[0].handle
+      await downloadShootsZip(shoots, zipName, (done, total) =>
+        setZipping(`Downloading ${done} of ${total}…`),
+      )
     } catch (err) {
       toast.add({
         type: "error",
@@ -83,51 +133,71 @@ export function ShootView({
     }
   }
 
-  const images = shoot.colors.flatMap((c) => c.images)
+  const images = shoots.flatMap((s) => s.colors.flatMap((c) => c.images))
   const count = (status: ShootImage["status"]) => images.filter((i) => i.status === status).length
   const done = count("done")
   const failed = count("failed")
-  const generating = shoot.status === "generating"
-  const shots = shoot.colors[0]?.images.length ?? 0
+  const generating = shoots.some((s) => s.status === "generating")
+  const colors = shoots.reduce((sum, s) => sum + s.colors.length, 0)
+  const shots = shoots[0]?.colors[0]?.images.length ?? 0
 
   return (
     <Page>
-      <PageHeader title={shoot.name}>
+      <PageHeader title={many ? `${shoots.length} products` : shoots[0].name}>
         <div className="flex flex-wrap gap-1">
           <Badge variant="outline">
-            {shoot.colors.length} colour{shoot.colors.length === 1 ? "" : "s"}
+            {colors} colour{colors === 1 ? "" : "s"}
           </Badge>
           <Badge variant="outline">
             {shots} shot{shots === 1 ? "" : "s"} each
           </Badge>
-          <Badge variant="outline">Folder {shoot.handle}</Badge>
+          {!many && <Badge variant="outline">Folder {shoots[0].handle}</Badge>}
         </div>
       </PageHeader>
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        {/* The contact sheet: one module per colour, its shots tiled inside. */}
-        <div className="flex min-w-0 flex-col gap-4">
-          {shoot.colors.map((color) => (
-            <Card key={color.name} size="sm">
-              <CardHeader className="border-b">
-                <CardTitle>{color.name}</CardTitle>
-                <CardDescription>
-                  {color.images.filter((i) => i.status === "done").length}/{color.images.length}{" "}
-                  done
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* One column per shot (no empty tracks), tiles capped in width. */}
-                <ul
-                  className="grid grid-cols-2 gap-2 sm:max-w-[calc(var(--shots)*14rem)] sm:grid-cols-[repeat(var(--shots),minmax(0,1fr))]"
-                  style={{ "--shots": color.images.length } as React.CSSProperties}
-                >
-                  {color.images.map((image) => (
-                    <ResultTile key={image.id} image={image} onRedo={onRedo} />
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
+        {/* The contact sheet: one module per colour, its shots tiled inside; grouped by product. */}
+        <div className="flex min-w-0 flex-col gap-6">
+          {shoots.map((shoot) => (
+            <section key={shoot.id} aria-label={shoot.name} className="flex flex-col gap-2">
+              {many && (
+                <header className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <h2 className="font-condensed text-xl leading-tight font-extrabold">
+                      {shoot.name}
+                    </h2>
+                    {shoot.description && (
+                      <p className="max-w-prose text-sm text-pretty text-muted-foreground">
+                        {shoot.description}
+                      </p>
+                    )}
+                  </div>
+                  <SaveState shoot={shoot} onSave={() => openSave([shoot])} />
+                </header>
+              )}
+              {shoot.colors.map((color) => (
+                <Card key={color.name} size="sm">
+                  <CardHeader className="border-b">
+                    <CardTitle>{color.name}</CardTitle>
+                    <CardDescription>
+                      {color.images.filter((i) => i.status === "done").length}/{color.images.length}{" "}
+                      done
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {/* One column per shot (no empty tracks), tiles capped in width. */}
+                    <ul
+                      className="grid grid-cols-2 gap-2 sm:max-w-[calc(var(--shots)*14rem)] sm:grid-cols-[repeat(var(--shots),minmax(0,1fr))]"
+                      style={{ "--shots": color.images.length } as React.CSSProperties}
+                    >
+                      {color.images.map((image) => (
+                        <ResultTile key={image.id} image={image} onRedo={(i) => onRedo(shoot, i)} />
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              ))}
+            </section>
           ))}
         </div>
 
@@ -144,7 +214,7 @@ export function ShootView({
               <Progress value={(done / images.length) * 100} aria-label="Images finished" />
             </div>
             <div className="flex flex-wrap gap-1">
-              {failed > 0 && <Badge>Failed {failed}</Badge>}
+              {failed > 0 && <Badge variant="alert">Failed {failed}</Badge>}
               {count("processing") > 0 && (
                 <Badge variant="outline">Working {count("processing")}</Badge>
               )}
@@ -152,7 +222,7 @@ export function ShootView({
               {done > 0 && <Badge variant="ink">Done {done}</Badge>}
             </div>
             <Button
-              onClick={() => download(shoot)}
+              onClick={download}
               disabled={generating || done === 0 || zipping !== null}
               className="w-full"
             >
@@ -168,20 +238,75 @@ export function ShootView({
                 ? "A minute or two per image. The .zip is ready when they all finish; Save any finished one meanwhile. You can leave and come back with this page's link."
                 : failed
                   ? "Retry the failed ones, or download what's finished."
-                  : "One folder with every image and description.txt."}
+                  : many
+                    ? "A folder per product, each with its images and description.txt."
+                    : "One folder with every image and description.txt."}
             </p>
-            {shoot.description && (
-              <p className="border-t pt-3 text-sm text-pretty">{shoot.description}</p>
+            {savable.length > 0 && (
+              <Button variant="outline" className="w-full" onClick={() => openSave(savable)}>
+                <PackagePlusIcon data-icon="inline-start" />
+                {savable.length === 1 ? "Save as product" : `Save ${savable.length} as products`}
+              </Button>
+            )}
+            {!many && shoots[0].productId && <ViewProduct shoot={shoots[0]} />}
+            {!many && shoots[0].description && (
+              <p className="border-t pt-3 text-sm text-pretty">{shoots[0].description}</p>
             )}
             <Button variant="outline" nativeButton={false} render={<Link href="/" />}>
               <PlusIcon data-icon="inline-start" />
-              New set
+              New upload
             </Button>
           </CardContent>
         </Card>
       </div>
+
+      <SaveProductsDialog
+        shoots={saving}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onSaved={onSaved}
+      />
     </Page>
   )
+}
+
+/** Finished, not saved yet, and at least one image to save. */
+function canSave(shoot: Shoot) {
+  return !shoot.productId && shoot.status !== "generating" && finishedColors(shoot).length > 0
+}
+
+function ViewProduct({ shoot }: { shoot: Shoot }) {
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      nativeButton={false}
+      render={<Link href={`/products/${shoot.productId}`} />}
+    >
+      View product
+    </Button>
+  )
+}
+
+/** Beside a product's name: its way into the shop, or why there isn't one yet. */
+function SaveState({ shoot, onSave }: { shoot: Shoot; onSave: () => void }) {
+  if (shoot.productId) {
+    return (
+      <span className="flex items-center gap-1">
+        <Badge variant="ink">Saved</Badge>
+        <ViewProduct shoot={shoot} />
+      </span>
+    )
+  }
+  if (canSave(shoot)) {
+    return (
+      <Button size="sm" variant="outline" onClick={onSave}>
+        <PackagePlusIcon data-icon="inline-start" />
+        Save as product
+      </Button>
+    )
+  }
+  return shoot.status === "generating" ? null : <Badge variant="alert">No images to save</Badge>
 }
 
 const STATE: Record<
@@ -191,7 +316,7 @@ const STATE: Record<
   done: { label: "Done", variant: "ink" },
   processing: { label: "Working", variant: "outline" },
   queued: { label: "Waiting", variant: "outline" },
-  failed: { label: "Failed", variant: "default" },
+  failed: { label: "Failed", variant: "alert" },
 }
 
 function ResultTile({ image, onRedo }: { image: ShootImage; onRedo: (image: ShootImage) => void }) {
@@ -204,10 +329,10 @@ function ResultTile({ image, onRedo }: { image: ShootImage; onRedo: (image: Shoo
     <li className="flex flex-col overflow-hidden rounded-sm border">
       <div className="relative aspect-[3/4] bg-muted">
         {shown ? (
-          // eslint-disable-next-line @next/next/no-img-element -- ImageKit resizes it
-          <img
-            src={imageUrl(image.output!, { width: PREVIEW_WIDTH })}
+          <ZoomImage
+            image={image.output!}
             alt={`${image.color}, ${image.shotName}`}
+            width={PREVIEW_WIDTH}
             className="size-full object-cover"
           />
         ) : (

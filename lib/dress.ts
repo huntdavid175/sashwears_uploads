@@ -61,6 +61,28 @@ export function normalizeProductType(value: unknown): string {
   return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, MAX_LABEL) : ""
 }
 
+export const MAX_TAGS = 20
+
+/**
+ * From a list or comma-separated text: "Midi Dress" → "midi-dress". Shopify's import asks for
+ * letters, numbers and hyphens, no accents or symbols.
+ */
+export function normalizeTags(value: unknown): string[] {
+  const list = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : []
+  const tags = list.flatMap((item) => {
+    if (typeof item !== "string") return []
+    const tag = item
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, MAX_LABEL)
+    return tag ? [tag] : []
+  })
+  return [...new Set(tags)].slice(0, MAX_TAGS)
+}
+
 export function normalizeColorName(value: unknown): string {
   const name = label(value, "Colour name")
   if (!name) throw new Error("Every colour needs a name")

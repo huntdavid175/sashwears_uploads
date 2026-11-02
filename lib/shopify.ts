@@ -1,23 +1,28 @@
 import { stockSizes } from "@/lib/dress"
+import { shotKey } from "@/lib/shoot"
 import type { Product, StoredImage } from "@/lib/types"
 
 /**
  * Shopify product CSV (the "URL handle" / "Inventory quantity" format), checked against
- * Shopify's product_template.csv on 2026-10-10. Only the columns we fill are included;
- * Shopify accepts a subset as long as "Title" is present.
+ * Shopify's product_template.csv and CSV guide on 2026-11-02. Only the columns we fill are
+ * included, in the template's order; Shopify accepts a subset as long as "Title" is present.
  *
  * Layout per product: one row per Color × Size variant (Option1 = Color, Option2 = Size; just
  * Color for one-size products), the first row also carries the product fields and option names.
  * Product images go on rows by position (extra rows hold only the handle and image when there
  * are more images than variants). Each colour's first finished photo (its front, usually) is that
- * colour's variant image. Products import as drafts.
+ * colour's variant image. Products import as drafts. Limits from Shopify's guide: SEO title 70
+ * characters, SEO description 320, alt text best under 125.
  */
 export const SHOPIFY_COLUMNS = [
   "Title",
   "URL handle",
+  "Description",
   "Type",
-  "Status",
+  "Tags",
   "Published on online store",
+  "Status",
+  "SKU",
   "Option1 name",
   "Option1 value",
   "Option2 name",
@@ -31,10 +36,51 @@ export const SHOPIFY_COLUMNS = [
   "Image position",
   "Image alt text",
   "Variant image URL",
+  "SEO title",
+  "SEO description",
 ] as const
 
 type Column = (typeof SHOPIFY_COLUMNS)[number]
 type Row = Partial<Record<Column, string | number>>
+
+const MAX_SEO_TITLE = 70
+const MAX_SEO_DESCRIPTION = 320
+
+/** Cut at a word, never mid-word. */
+function shorten(text: string, max: number) {
+  if (text.length <= max) return text
+  const cut = text.slice(0, max + 1)
+  return cut.slice(0, cut.lastIndexOf(" ")).trim()
+}
+
+/** "front" → "Front", "three-quarter" → "Three quarter". */
+function shotLabel(view: string) {
+  const words = view.replace(/-/g, " ")
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+/** Unique per variant: the handle is, and a product's colours and sizes are. */
+function variantSku(handle: string, color: string, size?: string) {
+  return [handle, shotKey(color), ...(size ? [shotKey(size)] : [])].join("-").toUpperCase()
+}
+
+function escapeHtml(text: string) {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+}
+
+/** Shopify reads the description as HTML; ours is plain text, maybe with line breaks. */
+function descriptionHtml(text: string) {
+  return text
+    .trim()
+    .split(/\n\s*\n/)
+    .map((p) => `<p>${escapeHtml(p.trim()).replace(/\s*\n\s*/g, "<br>")}</p>`)
+    .join("")
+}
+
+/** One line for search results. */
+function seoDescription(text: string) {
+  return shorten(text.replace(/\s+/g, " ").trim(), MAX_SEO_DESCRIPTION)
+}
 
 /** Original file from ImageKit (Shopify re-hosts it on import). */
 function original(image: StoredImage) {
@@ -65,7 +111,7 @@ export function productRows(product: Product): Row[] {
       .filter((p) => p.output)
       .map((p) => ({
         url: original(p.output!),
-        alt: `${product.name} – ${color.name}, ${p.view}`,
+        alt: `${product.name} in ${color.name}, ${shotLabel(p.view).toLowerCase()} view`,
       })),
   )
 
@@ -74,13 +120,14 @@ export function productRows(product: Product): Row[] {
     const cover = color.photos.find((p) => p.output)!.output!
     return stockSizes(product.sizes).map((size) => ({
       "URL handle": handle,
+      SKU: variantSku(handle, color.name, sized ? size : undefined),
       "Option1 value": color.name,
       "Option2 value": sized ? size : undefined,
       Price: product.price.toFixed(2),
       "Inventory tracker": "shopify",
       "Inventory quantity": color.quantities[size] ?? 0,
       "Continue selling when out of stock": "deny",
-      "Requires shipping": "TRUE",
+      "Requires shipping": "true",
       "Variant image URL": original(cover),
     }))
   })
@@ -96,11 +143,15 @@ export function productRows(product: Product): Row[] {
   })
   Object.assign(rows[0], {
     Title: product.name,
+    Description: product.description && descriptionHtml(product.description),
     Type: product.productType,
+    Tags: product.tags.join(", "),
     Status: "draft",
-    "Published on online store": "TRUE",
+    "Published on online store": "true",
     "Option1 name": "Color",
     "Option2 name": sized ? "Size" : undefined,
+    "SEO title": shorten(product.name!, MAX_SEO_TITLE),
+    "SEO description": product.description && seoDescription(product.description),
   })
   return rows
 }
@@ -112,8 +163,8 @@ export function toShopifyCsv(products: Product[]): string {
       lines.push(SHOPIFY_COLUMNS.map((c) => cell(row[c])).join(","))
     }
   }
-  // CRLF + BOM: what Excel and Shopify both read without mangling accents.
-  return "﻿" + lines.join("\r\n") + "\r\n"
+  // UTF-8 with LF line ends, as Shopify's guide asks. No BOM: it would sit in front of "Title".
+  return lines.join("\n") + "\n"
 }
 
 function cell(value: string | number | undefined) {

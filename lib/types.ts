@@ -144,6 +144,10 @@ export type Product = {
   price: number
   /** In display order, e.g. ["S", "M", "L", "XL", "XXL"]; empty for one-size products. */
   sizes: string[]
+  /** Shop description (Shopify's product description). */
+  description?: string
+  /** Letters, numbers and hyphens: what Shopify's import asks for. */
+  tags: string[]
   note?: string
   templateId?: string
   exportedAt?: string
@@ -193,9 +197,21 @@ export type Shoot = {
   name: string
   handle: string
   description: string
+  /** The AI's suggestions, for when the set is saved as a product. */
+  productType?: string
+  tags: string[]
+  /** The product it was saved as, if any. */
+  productId?: string
   templateId?: string
   createdAt: string
   /** In the owner's order; the template's shot order inside each. */
   colors: { name: string; images: ShootImage[] }[]
+  status: ProductStatus
+}
+
+/** One upload of many products: a set per product, in the owner's order. */
+export type Batch = {
+  id: string
+  shoots: Shoot[]
   status: ProductStatus
 }

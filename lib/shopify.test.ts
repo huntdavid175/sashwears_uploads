@@ -27,6 +27,8 @@ const product: Product = {
   handle: "satin-wrap-dress",
   price: 450,
   sizes: ["S", "M"],
+  tags: ["wrap-dress", "satin"],
+  description: "A <soft> wrap dress. ".repeat(30).trim(),
   createdAt: "",
   updatedAt: "",
   status: "ready",
@@ -135,8 +137,40 @@ describe("toShopifyCsv", () => {
     expect(get(r[0], "Inventory quantity")).toBe("4")
   })
 
+  it("writes what Shopify's guide asks for: LF line ends, no BOM, lowercase values", () => {
+    const csv = toShopifyCsv([product])
+    expect(csv.startsWith("Title,")).toBe(true)
+    expect(csv).not.toContain("\r")
+    expect(get(body[0], "Published on online store")).toBe("true")
+    expect(get(body[0], "Requires shipping")).toBe("true")
+    expect(get(body[0], "Continue selling when out of stock")).toBe("deny")
+  })
+
+  it("keeps a description's paragraphs in the HTML and flattens them for search", () => {
+    const description = "First line\nSecond line\n\nA <new> paragraph\n"
+    const [head, first] = parse(toShopifyCsv([{ ...product, description }]))
+    const at = (column: string) => first[head.indexOf(column)]
+    expect(at("Description")).toBe("<p>First line<br>Second line</p><p>A &lt;new&gt; paragraph</p>")
+    expect(at("SEO description")).toBe("First line Second line A <new> paragraph")
+  })
+
   it("refuses dresses that aren't ready", () => {
     expect(() => toShopifyCsv([{ ...product, status: "generating" }])).toThrow(/generating/)
     expect(() => toShopifyCsv([{ ...product, name: undefined }])).toThrow(/named/)
+  })
+
+  it("fills what Shopify's import uses for search and stock", () => {
+    const [header, first, second] = parse(toShopifyCsv([product]))
+    const at = (row: string[], column: string) => row[header.indexOf(column)]
+    expect(at(first, "Tags")).toBe("wrap-dress, satin")
+    expect(at(first, "SKU")).toBe("SATIN-WRAP-DRESS-BLACK-S")
+    expect(at(second, "SKU")).toBe("SATIN-WRAP-DRESS-BLACK-M")
+    expect(at(second, "Title")).toBe("")
+    expect(at(first, "Image alt text")).toBe('Satin "Wrap" Dress in Black, front view')
+    expect(at(first, "Description")).toContain("&lt;soft&gt;")
+    expect(at(first, "SEO title")).toBe('Satin "Wrap" Dress')
+    expect(at(first, "SEO description").length).toBeLessThanOrEqual(320)
+    // Cut at a word: "A <soft> wrap dress." repeats, so it ends on one of those whole words.
+    expect(at(first, "SEO description")).toMatch(/(^|\s)(A|<soft>|wrap|dress\.)$/)
   })
 })

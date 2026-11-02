@@ -1,9 +1,9 @@
 /** Set and shot rules shared by the API (validation, planning) and the UI (review, forms). */
 
-import type { GarmentRole, PhotoView, Shot } from "@/lib/types"
+import type { GarmentRole, PhotoView, Shoot, Shot } from "@/lib/types"
 
-/** Product photos in one set. */
-export const MAX_SHOOT_PHOTOS = 40
+/** Product photos in one upload, across all its products. */
+export const MAX_BATCH_PHOTOS = 120
 /** Photos of one colour and shot sent to an edit (more adds cost, not fidelity). */
 export const MAX_PER_SIDE = 3
 /** Photos of the colour's other shots sent along for colour and material. */
@@ -37,6 +37,19 @@ export function shotKey(name: string) {
 /** A shot's name, else its key. */
 export function shotName(shots: Shot[], key: string) {
   return shots.find((s) => s.key === key)?.name ?? key
+}
+
+/**
+ * What a set can save as a product: each colour's finished images. A colour with none is left out.
+ * An image being redone isn't finished: its file is about to be replaced.
+ */
+export function finishedColors(shoot: Pick<Shoot, "colors">) {
+  return shoot.colors.flatMap((color) => {
+    const images = color.images.filter(
+      (i) => i.output && i.status !== "queued" && i.status !== "processing",
+    )
+    return images.length ? [{ name: color.name, images }] : []
+  })
 }
 
 export type PlannedInput<T> = {

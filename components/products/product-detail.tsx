@@ -2,7 +2,6 @@
 
 import {
   DownloadIcon,
-  EllipsisIcon,
   PencilIcon,
   RefreshCwIcon,
   RotateCcwIcon,
@@ -15,27 +14,11 @@ import { useState } from "react"
 import { Compare } from "@/components/compare"
 import { Elapsed } from "@/components/elapsed"
 import { Page, PageHeader } from "@/components/page"
+import { ZoomImage } from "@/components/photos/zoom-image"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { toast } from "@/components/ui/toast"
@@ -45,6 +28,7 @@ import { SHOPIFY_EXPORT } from "@/lib/features"
 import { DEFAULT_SHOTS, shotName } from "@/lib/shoot"
 import type { Product, ProductColor, ProductPhoto } from "@/lib/types"
 
+import { DeleteProductDialog } from "./delete-product-dialog"
 import { EditProductDialog } from "./edit-product-dialog"
 import { ProductStatus } from "./product-card"
 
@@ -78,6 +62,11 @@ export function ProductDetail() {
     setBusy("export")
     try {
       await exportToShopify([id])
+      toast.add({
+        type: "success",
+        title: "Exported",
+        description: "In Shopify: Products → Import, then choose this file.",
+      })
       refresh()
     } catch (err) {
       toast.add({ type: "error", title: "Couldn't export", description: (err as Error).message })
@@ -102,16 +91,6 @@ export function ProductDetail() {
       a.remove()
     }
     setBusy(null)
-  }
-
-  async function remove() {
-    try {
-      await api(`/api/products/${id}`, { method: "DELETE" })
-      toast.add({ type: "success", title: "Product deleted" })
-      router.push("/products")
-    } catch (err) {
-      toast.add({ type: "error", title: "Couldn't delete", description: (err as Error).message })
-    }
   }
 
   if (error && !product) {
@@ -159,39 +138,45 @@ export function ProductDetail() {
                 Export to Shopify
               </Button>
             )}
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={<Button size="icon" variant="outline" aria-label="More" />}
-              >
-                <EllipsisIcon />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuGroup>
-                  <DropdownMenuItem
-                    disabled={!hasOutputs || busy !== null}
-                    onClick={() => downloadAll(product)}
-                  >
-                    <DownloadIcon />
-                    Download all photos
-                  </DropdownMenuItem>
-                  <DropdownMenuItem variant="destructive" onClick={() => setDeleting(true)}>
-                    <Trash2Icon />
-                    Delete product
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button
+              variant="outline"
+              disabled={!hasOutputs || busy !== null}
+              onClick={() => downloadAll(product)}
+            >
+              {busy === "download" ? (
+                <Spinner data-icon="inline-start" />
+              ) : (
+                <DownloadIcon data-icon="inline-start" />
+              )}
+              Download photos
+            </Button>
+            <Button variant="destructive" onClick={() => setDeleting(true)}>
+              <Trash2Icon data-icon="inline-start" />
+              Delete
+            </Button>
           </>
         }
       >
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
           <ProductStatus product={product} />
           {product.productType && <Badge variant="outline">{product.productType}</Badge>}
-          <span className="text-2xl font-bold text-primary">{formatPrice(product.price)}</span>
+          <span className="text-2xl font-bold text-primary-ink">{formatPrice(product.price)}</span>
           <span className="text-muted-foreground">
             {product.sizes.length ? product.sizes.join(" · ") : "One size"} · {stock} in stock
           </span>
         </div>
+        {product.description && (
+          <p className="max-w-prose text-sm text-pretty">{product.description}</p>
+        )}
+        {product.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {product.tags.map((tag) => (
+              <Badge key={tag} variant="outline">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        )}
         {product.note && <p className="max-w-prose text-sm">{product.note}</p>}
       </PageHeader>
 
@@ -214,23 +199,13 @@ export function ProductDetail() {
         onSaved={setProduct}
       />
 
-      <AlertDialog open={deleting} onOpenChange={setDeleting}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this product?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Its photos (originals and results) are removed from ImageKit too. This can&apos;t be
-              undone. Products already imported into Shopify aren&apos;t affected.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={remove}>
-              Delete product
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {deleting && (
+        <DeleteProductDialog
+          product={product}
+          onClose={() => setDeleting(false)}
+          onDeleted={() => router.push("/products")}
+        />
+      )}
     </Page>
   )
 }
@@ -306,14 +281,21 @@ function PhotoTile({
           />
         ) : (
           <div style={{ aspectRatio: aspect }}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- ImageKit resizes it */}
-            <img
-              src={imageUrl(shown, { width: PREVIEW_WIDTH })}
-              alt={label}
-              className={
-                running ? "size-full object-contain opacity-50" : "size-full object-contain"
-              }
-            />
+            {running ? (
+              // eslint-disable-next-line @next/next/no-img-element -- ImageKit resizes it
+              <img
+                src={imageUrl(shown, { width: PREVIEW_WIDTH })}
+                alt={label}
+                className="size-full object-contain opacity-50"
+              />
+            ) : (
+              <ZoomImage
+                image={shown}
+                alt={label}
+                width={PREVIEW_WIDTH}
+                className="size-full object-contain"
+              />
+            )}
           </div>
         )}
         {running ? (

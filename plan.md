@@ -160,6 +160,48 @@ skill: the owner chose **Retail Mosaic** (dense hairline modules, one utility re
 - [x] `/dresses` → `/products`; tests (57) / lint / tsc / build; migration applied
 - [ ] **You:** make a bag template (scene or model) with its shots, run a real bag set
 
+## Phase 15 — Many products in one upload
+Spec: on a template set the owner drops the photos of **many** products at once, mixed. The AI sorts them into
+products (same design = same product, whatever the colour or side), then by colour and shot, and writes a name +
+description per product. She reviews (merge products the AI split, move a photo between products, leave one out),
+then every colour of every product gets every shot. Each product stays a set with its own folder; one upload is a
+**batch** with one result page and one `.zip` (a folder per product). Up to 120 photos at once.
+
+- [x] DB: `shoots.batch_id` / `batch_position`; migration applied
+- [x] `sortBatchPhotos` (one vision call, sharper previews, one retry) + `POST /api/shoots/sort`
+- [x] `POST /api/shoots` takes products and saves the whole batch in one statement; any shot key (was front/back only)
+- [x] `GET /api/batches/[id]`, `/batches/[id]`, `.zip` with a folder per product
+- [x] Review: a module per product, merge / move / leave out (`lib/batch-review.ts`), total cost
+- [x] Tests / lint / tsc / build; flow driven in headless Edge with stubbed APIs
+- [ ] **You:** run a real mixed upload and check how well the AI tells similar products apart
+
+## Phase 16 — Save sets as products
+Spec: on the result page the owner saves one product, or all of them, to `/products` with a price and sizes.
+Whatever finished is saved: one finished image is enough; a colour with none is left out, a product with none can't
+be saved. Stock starts at 0, set on the product. The images are copied so a later redo can't break the product.
+
+- [x] DB: `products.shoot_id` (unique) / `description`, `shoots.product_type`; migration applied
+- [x] `POST /api/shoots/[id]/save`, `saveShootAsProduct`, `finishedColors`; product type back in the sort
+- [x] UI: Save as product per product, Save all, dialog with price, type and sizes per product
+- [x] Description on products: detail page, edit dialog, Shopify `Description` column
+- [x] Save list shows each product's images; stock as plain words, the AI arranges it (unlisted = 0), shown after saving
+- [x] Tags: AI suggestion on the sort (or at save), editable, on products and in the export
+- [x] Shopify CSV in the template's column order: `Tags`, `SKU`, alt text, `SEO title`, `SEO description`
+- [x] Tests / lint / tsc / build; flow driven in headless Edge with stubbed APIs
+
+## Shopify export switched on
+Spec: the Export to Shopify buttons show again on `/products` and each product page. The CSV follows Shopify's
+guide (checked 2026-11-02): UTF-8 with LF line ends and no BOM, lowercase `true`, line breaks in the description
+kept as HTML and flattened for the SEO description. The dialog warns what Overwrite does on a re-import.
+
+- [x] `SHOPIFY_EXPORT` on; CSV fixes and tests
+- [ ] **You:** import a real export into Shopify and check a product's variants, images and stock
+
+## Delete from the Products list
+Spec: every card on `/products` has a delete button, and the product page shows Delete instead of hiding it in a menu; both ask first (`delete-product-dialog`).
+
+- [x] Delete on cards and product page, shared confirm dialog; flows driven in headless Edge with DELETE stubbed
+
 ---
 
 ## Assumptions

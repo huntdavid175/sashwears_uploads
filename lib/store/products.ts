@@ -27,6 +27,8 @@ type ProductRow = {
   product_type: string | null
   price: string | number
   sizes: string[]
+  description: string | null
+  tags: string[]
   note: string | null
   template_id: string | null
   exported_at: unknown
@@ -95,6 +97,8 @@ async function assemble(rows: ProductRow[]): Promise<Product[]> {
       productType: r.product_type ?? undefined,
       price: Number(r.price),
       sizes: r.sizes,
+      description: r.description ?? undefined,
+      tags: r.tags,
       note: r.note ?? undefined,
       templateId: r.template_id ?? undefined,
       exportedAt: isoOrUndefined(r.exported_at),
@@ -259,7 +263,11 @@ export type CompletedProductInput = {
   handle: string
   price: number
   sizes: string[]
+  description?: string
+  tags?: string[]
   note?: string
+  /** The set it was made from, if any. */
+  shootId?: string
   colors: {
     name: string
     quantities: Record<string, number>
@@ -282,8 +290,10 @@ export async function createCompletedProduct(input: CompletedProductInput): Prom
   try {
     await getDb().query(
       `WITH p AS (
-         INSERT INTO products (id, kind, name, handle, price, sizes, note, product_type)
-         VALUES ($1, 'completed', $2, $3, $4, $5, $6, $9) RETURNING id
+         INSERT INTO products (id, kind, name, handle, price, sizes, note, product_type,
+           description, shoot_id, tags)
+         VALUES ($1, 'completed', $2, $3, $4, $5, $6, $9, $10, $11::uuid, $12::text[])
+         RETURNING id
        ), c AS (
          INSERT INTO product_colors (id, product_id, name, position, quantities)
          SELECT x.id, (SELECT id FROM p), x.name, x.position, x.quantities
@@ -304,6 +314,9 @@ export async function createCompletedProduct(input: CompletedProductInput): Prom
         JSON.stringify(colors),
         JSON.stringify(photos),
         input.productType ?? null,
+        input.description ?? null,
+        input.shootId ?? null,
+        input.tags ?? [],
       ],
     )
   } catch (err) {
@@ -370,6 +383,8 @@ export async function saveProduct(
     name?: string
     handle?: string
     productType?: string
+    description?: string
+    tags?: string[]
     price?: number
     sizes?: string[]
     colors?: { id: string; name: string; quantities: Record<string, number> }[]
@@ -379,7 +394,9 @@ export async function saveProduct(
     await getDb().query(
       `UPDATE products SET name = COALESCE($2, name), handle = COALESCE($3, handle),
          price = COALESCE($4, price), sizes = COALESCE($5, sizes),
-         product_type = COALESCE(NULLIF($6, ''), product_type), updated_at = now()
+         product_type = COALESCE(NULLIF($6, ''), product_type),
+         description = COALESCE($7, description), tags = COALESCE($8::text[], tags),
+         updated_at = now()
        WHERE id = $1`,
       [
         id,
@@ -388,6 +405,8 @@ export async function saveProduct(
         patch.price ?? null,
         patch.sizes ?? null,
         patch.productType ?? null,
+        patch.description ?? null,
+        patch.tags ?? null,
       ],
     )
   } catch (err) {
