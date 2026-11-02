@@ -160,7 +160,7 @@ export function ProductDetail() {
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
           <ProductStatus product={product} />
           {product.productType && <Badge variant="outline">{product.productType}</Badge>}
-          <span className="text-2xl font-bold text-primary">{formatPrice(product.price)}</span>
+          <span className="text-2xl font-bold text-primary-ink">{formatPrice(product.price)}</span>
           <span className="text-muted-foreground">
             {product.sizes.length ? product.sizes.join(" · ") : "One size"} · {stock} in stock
           </span>

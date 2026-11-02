@@ -214,7 +214,7 @@ export function SetsView({
               <Progress value={(done / images.length) * 100} aria-label="Images finished" />
             </div>
             <div className="flex flex-wrap gap-1">
-              {failed > 0 && <Badge>Failed {failed}</Badge>}
+              {failed > 0 && <Badge variant="alert">Failed {failed}</Badge>}
               {count("processing") > 0 && (
                 <Badge variant="outline">Working {count("processing")}</Badge>
               )}
@@ -316,7 +316,7 @@ const STATE: Record<
   done: { label: "Done", variant: "ink" },
   processing: { label: "Working", variant: "outline" },
   queued: { label: "Waiting", variant: "outline" },
-  failed: { label: "Failed", variant: "default" },
+  failed: { label: "Failed", variant: "alert" },
 }
 
 function ResultTile({ image, onRedo }: { image: ShootImage; onRedo: (image: ShootImage) => void }) {

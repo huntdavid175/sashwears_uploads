@@ -252,7 +252,7 @@ function TemplateChoice({ template, id }: { template: Template; id: string }) {
   return (
     <FieldLabel
       htmlFor={id}
-      className="rounded-sm has-data-checked:border-primary has-data-checked:bg-card! has-data-checked:ring-1 has-data-checked:ring-primary"
+      className="rounded-sm has-data-checked:border-primary-ink has-data-checked:bg-card! has-data-checked:ring-1 has-data-checked:ring-primary-ink"
     >
       <Field orientation="horizontal" className="items-start">
         <FieldContent className="min-w-0 gap-2">

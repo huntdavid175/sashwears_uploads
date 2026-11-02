@@ -264,7 +264,7 @@ function TemplateForm({
                   type="button"
                   onClick={() => addShot()}
                   disabled={saving}
-                  className="flex aspect-[3/4] w-full flex-col items-center justify-center gap-1 rounded-sm border border-dashed border-input text-sm text-muted-foreground outline-none hover:border-primary hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+                  className="flex aspect-[3/4] w-full flex-col items-center justify-center gap-1 rounded-sm border border-dashed border-input text-sm text-muted-foreground outline-none hover:border-primary-ink hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
                 >
                   <PlusIcon className="size-5" />
                   Add a shot
@@ -410,7 +410,7 @@ function ShotSlot({
           htmlFor={`${id}-file`}
           aria-invalid={invalid || undefined}
           className={cn(
-            "relative flex aspect-[3/4] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-sm border border-dashed border-input bg-muted p-2 text-center text-xs text-muted-foreground hover:border-primary has-focus-visible:ring-3 has-focus-visible:ring-ring/50 aria-invalid:border-destructive",
+            "relative flex aspect-[3/4] cursor-pointer flex-col items-center justify-center gap-1 overflow-hidden rounded-sm border border-dashed border-input bg-muted p-2 text-center text-xs text-muted-foreground hover:border-primary-ink has-focus-visible:ring-3 has-focus-visible:ring-ring/50 aria-invalid:border-destructive",
             preview && "border-solid",
             disabled && "pointer-events-none opacity-60",
           )}

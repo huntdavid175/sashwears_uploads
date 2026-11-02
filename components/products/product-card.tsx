@@ -42,7 +42,7 @@ export function ProductCard({ product, onDelete }: { product: Product; onDelete:
     <div className="relative">
       <Link
         href={`/products/${product.id}`}
-        className="group flex h-full flex-col overflow-hidden rounded-sm border bg-card text-card-foreground outline-none hover:border-primary focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="group flex h-full flex-col overflow-hidden rounded-sm border bg-card text-card-foreground outline-none hover:border-primary-ink focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         <div className="relative aspect-[3/4] bg-muted">
           {cover && (
@@ -62,14 +62,14 @@ export function ProductCard({ product, onDelete }: { product: Product; onDelete:
           {product.productType && (
             <span className="text-xs text-muted-foreground">{product.productType}</span>
           )}
-          <p className="line-clamp-2 text-sm leading-snug font-bold group-hover:text-primary">
+          <p className="line-clamp-2 text-sm leading-snug font-bold group-hover:text-primary-ink">
             {product.name ?? <span className="text-muted-foreground">Naming…</span>}
           </p>
           <p className="text-xs text-muted-foreground">
             {product.colors.length} colour{product.colors.length === 1 ? "" : "s"} · {stock} in
             stock
           </p>
-          <p className="text-lg font-bold text-primary">{formatPrice(product.price)}</p>
+          <p className="text-lg font-bold text-primary-ink">{formatPrice(product.price)}</p>
         </div>
       </Link>
       <Button

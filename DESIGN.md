@@ -2,6 +2,8 @@
 name: Backdrop Studio
 description: A dense retail module mosaic for turning product photos into shop-ready sets.
 colors:
+  light-green: "#86efac"
+  green-ink: "#166534"
   utility-red: "#e60012"
   utility-red-lifted: "#ff3b46"
   ink: "#111111"
@@ -61,8 +63,8 @@ spacing:
   page-pad: "24px"
 components:
   button-primary:
-    backgroundColor: "{colors.utility-red}"
-    textColor: "{colors.module-white}"
+    backgroundColor: "{colors.light-green}"
+    textColor: "{colors.ink}"
     rounded: "{rounded.module}"
     padding: "0 10px"
     height: "32px"
@@ -96,9 +98,9 @@ components:
     rounded: "{rounded.tile}"
     padding: "2px 6px"
     height: "20px"
-  tag-red:
-    backgroundColor: "{colors.utility-red}"
-    textColor: "{colors.module-white}"
+  tag-green:
+    backgroundColor: "{colors.light-green}"
+    textColor: "{colors.ink}"
     typography: "{typography.label}"
     rounded: "{rounded.tile}"
     padding: "2px 6px"
@@ -118,12 +120,12 @@ components:
     padding: "2px 6px"
     height: "20px"
   toggle-pressed:
-    backgroundColor: "{colors.utility-red}"
-    textColor: "{colors.module-white}"
+    backgroundColor: "{colors.light-green}"
+    textColor: "{colors.ink}"
     rounded: "{rounded.module}"
     height: "32px"
   nav-tab-active:
-    textColor: "{colors.utility-red}"
+    textColor: "{colors.green-ink}"
     padding: "10px 12px"
 ---
 
@@ -135,28 +137,30 @@ components:
 
 Backdrop Studio is a working floor, not a showroom. Every colour, shot, cost and state is tiled onto one screen as white modules ruled with hairlines on a light-grey canvas, the way a dense Japanese retail catalogue packs a page. The owner should read the whole job at a glance: what each image is made from, what it costs, and what is done.
 
-The system is compact and literal. Body type is small (14px) with tight leading, figures are tabular, and modules carry a bold title bar ruled off from their content. One utility red does all the pointing: the current tab, the one action that spends money, prices and costs, and anything that needs attention. Everything else is ink and greys. Depth comes from hairlines and the canvas/module contrast, not shadows.
+The system is compact and literal. Body type is small (14px) with tight leading, figures are tabular, and modules carry a bold title bar ruled off from their content. One light green does all the pointing: the current tab, the one action that spends money, prices and costs. Red appears only for failures, warnings and deleting. Everything else is ink and greys. Depth comes from hairlines and the canvas/module contrast, not shadows.
 
-Small rectangular tags are the system's vocabulary for provenance and state. They sit in the corner of image tiles and in title bars, and their fill (ink, red, red outline, grey outline) carries meaning consistently across review, results, products and templates. Dark mode is the same mosaic after hours: an ink canvas, lifted near-black modules, hairlines that still read, and a lifted red.
+Small rectangular tags are the system's vocabulary for provenance and state. They sit in the corner of image tiles and in title bars, and their fill (ink, green, red outline, grey outline) carries meaning consistently across review, results, products and templates. Dark mode is the same mosaic after hours: an ink canvas, lifted near-black modules, hairlines that still read, and the same light green, bright enough there to be its own text colour.
 
 **Key Characteristics:**
 - White hairline-ruled modules tiled on a light-grey canvas; wide (max 80rem) so rails and mosaics sit side by side.
-- One utility red for tabs, the primary action, prices/costs and attention; never decorative.
+- One light green for tabs, the primary action and prices/costs; never decorative. Red is only for failures, warnings and deleting.
 - Archivo throughout: heavy condensed display for wordmark, page titles and template names; compact 14px body; tabular figures everywhere.
 - Tight radii (2-4px) and 1px rules; flat at rest.
 - Rectangular tags whose fill encodes provenance and state.
 
 ## Colors
 
-A near-monochrome retail palette: ink, white and stepped greys, with one saturated utility red.
+A near-monochrome retail palette: ink, white and stepped greys, with one light green, and red held back for trouble.
 
 ### Primary
-- **Utility Red** (light `utility-red`, dark `utility-red-lifted`): the active nav tab and its underline, the primary button (Generate, Save, New template), pressed toggles, prices and the estimated cost, coverage counts that fall short, focus rings, caret and selection tint, and the filled/outline tags. It is also the destructive token, so destructive actions read as attention, not a second hue.
+- **Light Green** (`light-green`, `--primary`): fills: the primary button (Generate, Save, New template), pressed toggles, rail title bars and filled tags, always with ink text. Too pale for text on white.
+- **Green Ink** (`green-ink`, `--primary-ink`, `text-primary-ink`; light green in dark mode): green as text or line on a light surface: prices and the estimated cost, the active nav tab and its underline, selected borders, focus rings, caret.
+- **Utility Red** (light `utility-red`, dark `utility-red-lifted`): `--destructive` only: failed and needs-attention tags, the alert outline tag, form errors, Delete.
 
 ### Neutral
 - **Ink** (`ink` / `night-ink`): all body and title text, the filled ink tag, the wordmark.
 - **Canvas Grey** (`canvas-grey` / `night-canvas`): the page behind the modules. The canvas is never used inside a module.
-- **Module White** (`module-white` / `night-module`): cards, header bar, popovers, the tile caption strip. Also the text colour on red and ink fills.
+- **Module White** (`module-white` / `night-module`): cards, header bar, popovers, the tile caption strip. Also the text colour on ink fills.
 - **Hairline** (`hairline` / `night-hairline`): every module border, title-bar rule, list-row divider and tile border.
 - **Hairline Strong** (`hairline-strong` / `night-hairline-strong`): input and outline-toggle strokes, scrollbars.
 - **Fill Grey** (`fill-grey` / `night-fill`): muted surfaces: image placeholders behind tiles, the grouped photo strip inside a colour module, skeletons.
@@ -164,7 +168,7 @@ A near-monochrome retail palette: ink, white and stepped greys, with one saturat
 - **Quiet Ink** (`quiet-ink` / `night-quiet-ink`): secondary lines (source line under a tile, descriptions, meta).
 
 ### Named Rules
-**The One Red Rule.** Red marks where you are, what spends money, what things cost, and what needs you. If an element is none of those, it is ink or grey.
+**The One Green Rule.** Green marks where you are, what spends money and what things cost. Red marks what went wrong or can't be undone. If an element is none of those, it is ink or grey.
 
 **The Semantic Token Rule.** Use the semantic tokens from `app/globals.css` (`--primary`, `--card`, `--border`, `--muted-foreground`, ...). Never raw colour values or `dark:` overrides in app code; the `.dark` block carries the theme.
 
@@ -177,7 +181,7 @@ A near-monochrome retail palette: ink, white and stepped greys, with one saturat
 
 ### Hierarchy
 - **Display** (800, condensed, 30px rising to 36px from md, line-height 1, -0.025em): page titles only. The wordmark uses the same voice at 20px; template names use it at 18px bold.
-- **Figure** (900, 30px, line-height 1, red): the single headline number on a decision, i.e. the estimated cost beside Generate. Secondary counts (images done, photos picked) use 24px bold ink.
+- **Figure** (900, 30px, line-height 1, green ink): the single headline number on a decision, i.e. the estimated cost beside Generate. Secondary counts (images done, photos picked) use 24px bold ink.
 - **Title** (700, 16px, 1.375; 14px in small modules): module title bars, tile shot names (14px bold), product names.
 - **Body** (400, 14px): everything else, descriptions capped at `max-w-prose`.
 - **Label** (600, 12px): tags; 12px regular quiet ink for tile source lines, legends and meta.
@@ -215,15 +219,15 @@ Tight, near-square geometry. Modules, buttons, inputs and toggles use the base r
 
 ### Buttons
 - **Shape:** gently squared (`rounded.module`, 4px), 32px tall default, 28px small, 24px extra-small, 36px large.
-- **Primary:** red fill, white 14px medium text; one per decision (Generate N images, Save, New template).
-- **Hover / Focus:** primary drops to 80% red; focus draws a 3px half-opacity red ring; active nudges down 1px.
+- **Primary:** light green fill, ink 14px medium text; one per decision (Generate N images, Save, New template).
+- **Hover / Focus:** primary drops to 80% green; focus draws a 3px half-opacity green-ink ring; active nudges down 1px.
 - **Outline:** canvas fill with a hairline stroke, hover to fill grey. **Ghost:** text only, hover fill grey; used for Fix sorting, Back, Retry, Download on tiles, and the theme icon.
 
 ### Tags
 - **Style:** small rectangles (20px tall, 12px semibold, `rounded.tile`).
 - **Ink** (filled ink): your own photo; done; ready; model template.
-- **Red** (filled red): borrowed from another colour; failed; default template.
-- **Alert** (red outline on module white): AI guess; needs attention; needs shots; a shot not covered by every colour.
+- **Green** (filled light green): borrowed from another colour; generating; default template.
+- **Alert** (red outline on module white): failed; AI guess; needs attention; needs shots; a shot not covered by every colour.
 - **Outline** (hairline on module white): waiting, working, meta (counts, folder), scene template, covered shots.
 
 ### Cards / Containers (Modules)

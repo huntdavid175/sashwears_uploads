@@ -64,7 +64,7 @@ export function AppHeaderShell({ pathname }: { pathname: string | null }) {
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
-              className="relative px-3 py-2.5 text-sm font-medium text-foreground outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50 aria-[current=page]:font-bold aria-[current=page]:text-primary aria-[current=page]:after:absolute aria-[current=page]:after:inset-x-3 aria-[current=page]:after:-bottom-px aria-[current=page]:after:h-0.5 aria-[current=page]:after:bg-primary"
+              className="relative px-3 py-2.5 text-sm font-medium text-foreground outline-none hover:text-primary-ink focus-visible:ring-3 focus-visible:ring-ring/50 aria-[current=page]:font-bold aria-[current=page]:text-primary-ink aria-[current=page]:after:absolute aria-[current=page]:after:inset-x-3 aria-[current=page]:after:-bottom-px aria-[current=page]:after:h-0.5 aria-[current=page]:after:bg-primary-ink"
             >
               {item.label}
             </Link>

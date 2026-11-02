@@ -162,7 +162,9 @@ export function ShootReview({
   )
   // The cost is the hero figure: large, heavy, red.
   const cost$ = (size: string) => (
-    <span className={cn("leading-none font-black text-primary", size)}>US${cost.toFixed(2)}</span>
+    <span className={cn("leading-none font-black text-primary-ink", size)}>
+      US${cost.toFixed(2)}
+    </span>
   )
 
   return (
@@ -180,7 +182,7 @@ export function ShootReview({
                 className="flex justify-between gap-2 px-3 py-1.5 hover:bg-muted"
               >
                 <span className="truncate">{productLabel(p, i)}</span>
-                <span className="font-bold text-primary">{plans[i].length}</span>
+                <span className="font-bold text-primary-ink">{plans[i].length}</span>
               </a>
             </li>
           ))}
