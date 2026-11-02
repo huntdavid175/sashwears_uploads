@@ -137,6 +137,23 @@ describe("toShopifyCsv", () => {
     expect(get(r[0], "Inventory quantity")).toBe("4")
   })
 
+  it("writes what Shopify's guide asks for: LF line ends, no BOM, lowercase values", () => {
+    const csv = toShopifyCsv([product])
+    expect(csv.startsWith("Title,")).toBe(true)
+    expect(csv).not.toContain("\r")
+    expect(get(body[0], "Published on online store")).toBe("true")
+    expect(get(body[0], "Requires shipping")).toBe("true")
+    expect(get(body[0], "Continue selling when out of stock")).toBe("deny")
+  })
+
+  it("keeps a description's paragraphs in the HTML and flattens them for search", () => {
+    const description = "First line\nSecond line\n\nA <new> paragraph\n"
+    const [head, first] = parse(toShopifyCsv([{ ...product, description }]))
+    const at = (column: string) => first[head.indexOf(column)]
+    expect(at("Description")).toBe("<p>First line<br>Second line</p><p>A &lt;new&gt; paragraph</p>")
+    expect(at("SEO description")).toBe("First line Second line A <new> paragraph")
+  })
+
   it("refuses dresses that aren't ready", () => {
     expect(() => toShopifyCsv([{ ...product, status: "generating" }])).toThrow(/generating/)
     expect(() => toShopifyCsv([{ ...product, name: undefined }])).toThrow(/named/)

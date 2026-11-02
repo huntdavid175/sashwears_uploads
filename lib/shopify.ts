@@ -4,8 +4,8 @@ import type { Product, StoredImage } from "@/lib/types"
 
 /**
  * Shopify product CSV (the "URL handle" / "Inventory quantity" format), checked against
- * Shopify's product_template.csv on 2026-10-30. Only the columns we fill are included, in the
- * template's order; Shopify accepts a subset as long as "Title" is present.
+ * Shopify's product_template.csv and CSV guide on 2026-11-02. Only the columns we fill are
+ * included, in the template's order; Shopify accepts a subset as long as "Title" is present.
  *
  * Layout per product: one row per Color × Size variant (Option1 = Color, Option2 = Size; just
  * Color for one-size products), the first row also carries the product fields and option names.
@@ -64,9 +64,22 @@ function variantSku(handle: string, color: string, size?: string) {
   return [handle, shotKey(color), ...(size ? [shotKey(size)] : [])].join("-").toUpperCase()
 }
 
-/** Shopify reads the description as HTML; ours is plain text. */
 function escapeHtml(text: string) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+}
+
+/** Shopify reads the description as HTML; ours is plain text, maybe with line breaks. */
+function descriptionHtml(text: string) {
+  return text
+    .trim()
+    .split(/\n\s*\n/)
+    .map((p) => `<p>${escapeHtml(p.trim()).replace(/\s*\n\s*/g, "<br>")}</p>`)
+    .join("")
+}
+
+/** One line for search results. */
+function seoDescription(text: string) {
+  return shorten(text.replace(/\s+/g, " ").trim(), MAX_SEO_DESCRIPTION)
 }
 
 /** Original file from ImageKit (Shopify re-hosts it on import). */
@@ -114,7 +127,7 @@ export function productRows(product: Product): Row[] {
       "Inventory tracker": "shopify",
       "Inventory quantity": color.quantities[size] ?? 0,
       "Continue selling when out of stock": "deny",
-      "Requires shipping": "TRUE",
+      "Requires shipping": "true",
       "Variant image URL": original(cover),
     }))
   })
@@ -130,15 +143,15 @@ export function productRows(product: Product): Row[] {
   })
   Object.assign(rows[0], {
     Title: product.name,
-    Description: product.description && escapeHtml(product.description),
+    Description: product.description && descriptionHtml(product.description),
     Type: product.productType,
     Tags: product.tags.join(", "),
     Status: "draft",
-    "Published on online store": "TRUE",
+    "Published on online store": "true",
     "Option1 name": "Color",
     "Option2 name": sized ? "Size" : undefined,
     "SEO title": shorten(product.name!, MAX_SEO_TITLE),
-    "SEO description": product.description && shorten(product.description, MAX_SEO_DESCRIPTION),
+    "SEO description": product.description && seoDescription(product.description),
   })
   return rows
 }
@@ -150,8 +163,8 @@ export function toShopifyCsv(products: Product[]): string {
       lines.push(SHOPIFY_COLUMNS.map((c) => cell(row[c])).join(","))
     }
   }
-  // CRLF + BOM: what Excel and Shopify both read without mangling accents.
-  return "﻿" + lines.join("\r\n") + "\r\n"
+  // UTF-8 with LF line ends, as Shopify's guide asks. No BOM: it would sit in front of "Title".
+  return lines.join("\n") + "\n"
 }
 
 function cell(value: string | number | undefined) {

@@ -3,13 +3,13 @@ import { toShopifyCsv } from "@/lib/shopify"
 import { StoreError } from "@/lib/store/errors"
 import { getProducts, markExported } from "@/lib/store/products"
 
-/** `{ ids }` → Shopify product CSV for those dresses, which are then marked exported. */
+/** `{ ids }` → Shopify product CSV for those products, which are then marked exported. */
 export async function POST(request: Request) {
   try {
     const body = await readJson(request)
     const ids = Array.isArray(body.ids) ? body.ids.filter((x) => typeof x === "string") : []
     const products = await getProducts(ids)
-    if (!products.length) throw new StoreError("invalid", "Choose at least one dress to export")
+    if (!products.length) throw new StoreError("invalid", "Choose at least one product to export")
 
     let csv: string
     try {

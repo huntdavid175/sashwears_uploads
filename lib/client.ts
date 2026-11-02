@@ -203,7 +203,7 @@ export function useProduct(id: string) {
   return { product: data, error, refresh, setProduct: setData }
 }
 
-/** Download the Shopify CSV for these dresses (the server marks them exported). */
+/** Download the Shopify CSV for these products (the server marks them exported). */
 export async function exportToShopify(ids: string[]) {
   const res = await fetch("/api/products/export", {
     method: "POST",

@@ -189,6 +189,19 @@ be saved. Stock starts at 0, set on the product. The images are copied so a late
 - [x] Shopify CSV in the template's column order: `Tags`, `SKU`, alt text, `SEO title`, `SEO description`
 - [x] Tests / lint / tsc / build; flow driven in headless Edge with stubbed APIs
 
+## Shopify export switched on
+Spec: the Export to Shopify buttons show again on `/products` and each product page. The CSV follows Shopify's
+guide (checked 2026-11-02): UTF-8 with LF line ends and no BOM, lowercase `true`, line breaks in the description
+kept as HTML and flattened for the SEO description. The dialog warns what Overwrite does on a re-import.
+
+- [x] `SHOPIFY_EXPORT` on; CSV fixes and tests
+- [ ] **You:** import a real export into Shopify and check a product's variants, images and stock
+
+## Delete from the Products list
+Spec: every card on `/products` has a delete button, and the product page shows Delete instead of hiding it in a menu; both ask first (`delete-product-dialog`).
+
+- [x] Delete on cards and product page, shared confirm dialog; flows driven in headless Edge with DELETE stubbed
+
 ---
 
 ## Assumptions

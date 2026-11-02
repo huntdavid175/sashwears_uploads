@@ -35,6 +35,7 @@ import { exportToShopify, useProducts } from "@/lib/client"
 import { SHOPIFY_EXPORT } from "@/lib/features"
 import type { Product } from "@/lib/types"
 
+import { DeleteProductDialog } from "./delete-product-dialog"
 import { ProductCard } from "./product-card"
 
 const ALL = "__all"
@@ -44,6 +45,7 @@ export function ProductList() {
   const id = useId()
   const { products, error, refresh } = useProducts()
   const [exporting, setExporting] = useState(false)
+  const [deleting, setDeleting] = useState<Product | null>(null)
   const [type, setType] = useState(ALL)
   const [query, setQuery] = useState("")
 
@@ -162,7 +164,7 @@ export function ProductList() {
             {shown.length ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
                 {shown.map((p) => (
-                  <ProductCard key={p.id} product={p} />
+                  <ProductCard key={p.id} product={p} onDelete={() => setDeleting(p)} />
                 ))}
               </div>
             ) : (
@@ -194,6 +196,13 @@ export function ProductList() {
         products={products ?? []}
         onExported={refresh}
       />
+      {deleting && (
+        <DeleteProductDialog
+          product={deleting}
+          onClose={() => setDeleting(null)}
+          onDeleted={refresh}
+        />
+      )}
     </Page>
   )
 }
@@ -295,6 +304,13 @@ function ExportForm({ products, onDone }: { products: Product[]; onDone: () => v
         <p className="text-sm text-muted-foreground">
           {waiting} product{waiting === 1 ? " isn't" : "s aren't"} ready yet (still generating or a
           photo failed) and {waiting === 1 ? "is" : "are"} left out.
+        </p>
+      )}
+      {which === "all" && ready.length > fresh.length && (
+        <p className="text-sm text-muted-foreground">
+          Shopify skips products it already has unless you tick &quot;Overwrite products with
+          matching handles&quot;. Overwriting sets them back to draft and replaces their stock with
+          the numbers here.
         </p>
       )}
       {error && <FieldError>{error}</FieldError>}
